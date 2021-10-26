@@ -127,7 +127,30 @@ Use `ena` crate?
 
 Satisfiable, Unsatisfiable, Timeout, Unknown (formula is not in BS)
 
+## Input
+
+### CASC EPR Track
+
+http://www.tptp.org/CASC/27/SelectedProblems.html
+http://www.tptp.org/CASC/J9/SelectedProblems.html
+
+### `qbf2epr`
+
+http://fmv.jku.at/qbf2epr/
+http://fmv.jku.at/papers/SeidlLonsingBiere-PAAR12.pdf
+
+### `smv2tptp`
+
+https://nokyotsu.com/me/tools/#effectively-propositional-logic
+
 ## Solvers
+
+### EPR
+
+https://www.cs.man.ac.uk/~korovink/iprover/index.html
+https://vprover.github.io/index.html
+
+### Rust CDCL
 
 https://github.com/shnarazk/splr
 https://github.com/jix/varisat (generates proofs)
