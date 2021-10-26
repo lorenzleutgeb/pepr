@@ -27,6 +27,24 @@ Requires normalizing.
 
 #### Unpacked
 
+Clauses are the addressed objects in the heap.
+
+For every clause, store a "header":
+ - length
+ - maybe indices of literals?
+ - other flags (ground?, future)
+Then, all literals.
+ 
+For every literal, store a "header":
+ - predicate symbol (integer)
+ - positive/negative
+ - other flags (ground?, future)
+Then, all terms.
+
+Every term is an integer (positive for constants, negative for variables).
+
+Binary clauses are to be stored separately.
+
 If packing does not work (not enough bits), then resort to a separate memory region for something...
 
 If it would be possible to consistently address the arguments of a predicate, i.e. a sequence of
