@@ -136,8 +136,16 @@ http://www.tptp.org/CASC/J9/SelectedProblems.html
 
 ### `qbf2epr`
 
+Python
+
 http://fmv.jku.at/qbf2epr/
 http://fmv.jku.at/papers/SeidlLonsingBiere-PAAR12.pdf
+
+### `qbftoepr`
+
+OCaml
+
+https://github.com/DavidTheWin/qbftoepr
 
 ### `smv2tptp`
 
@@ -147,7 +155,16 @@ https://nokyotsu.com/me/tools/#effectively-propositional-logic
 
 ### EPR
 
+#### iProver
+
+OCaml
+
 https://www.cs.man.ac.uk/~korovink/iprover/index.html
+
+#### Vampire
+
+C++
+
 https://vprover.github.io/index.html
 
 ### Rust CDCL
