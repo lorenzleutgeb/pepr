@@ -151,6 +151,16 @@ https://github.com/DavidTheWin/qbftoepr
 
 https://nokyotsu.com/me/tools/#effectively-propositional-logic
 
+## Grounders
+
+### `eground`
+
+C
+
+Part of E.
+
+https://wwwlehre.dhbw-stuttgart.de/~sschulz/E/E.html
+
 ## Solvers
 
 ### EPR
