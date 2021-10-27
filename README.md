@@ -163,15 +163,22 @@ https://wwwlehre.dhbw-stuttgart.de/~sschulz/E/E.html
 
 ## Solvers
 
-### EPR
+### First-Order
 
-#### iProver
+#### Rust
+
+https://github.com/MichaelRawson/lazycop/
+https://github.com/01mf02/cop-rs
+
+#### Non-Rust CASC EPR Winners
+
+##### iProver
 
 OCaml
 
 https://www.cs.man.ac.uk/~korovink/iprover/index.html
 
-#### Vampire
+##### Vampire
 
 C++
 
