@@ -63,6 +63,8 @@ We spend one bit to encode sign:
 
 All predicate symbols are known after normalization, and can be numbered.
 
+Globally keep a mapping that stores the arity per predicate.
+
 ##### Terms
 
 The number of variables (and whether they are quantified universally or existentially)
@@ -98,8 +100,11 @@ literals/clauses directly?! If the ordering is dynamic, this does not work.
 
 ###### Even
 
-  1 bit for sign
- 21 bits for 2097152 predicates of maximum arity 1
+  1 bit for       2 signs
+ 21 bit for 2097152 predicates of maximum arity 1
+
+leaves (64 - 1 - 21) / 2 = 21 bit
+
  21 bits for 2097152 existentially quantified variables
  21 bits for 2097152 universally quantified variables
 
@@ -107,17 +112,43 @@ literals/clauses directly?! If the ordering is dynamic, this does not work.
 
 On a 64bit machine, we could encode:
 
- 1 bit  for sign
- 2 bits for 4 predicates of maximum arity 1
-30 bits for 1073741824 existentially quantified variables
-30 bits for 1073741824 universally quantified variables
+  1 bit for 2 signs
+  2 bit for 4 predicates of maximum arity 1
+
+leaves (64 - 1 - 2) / 1 = 60 bit
+
+ 30 bit for 1073741824 existentially quantified variables
+ 30 bit for 1073741824 universally quantified variables
 
 ###### Arity
 
-  1 bit for sign
- 13 bits for 8192 predicates of maximum arity 4
- 12 bits for 4096 existentially quantified variables
- 12 bits for 4096 universally quantified variables
+  1 bit for    2 signs
+ 13 bit for 8192 predicates of maximum arity 4
+
+leaves (64 - 1 - 13) / 4 = 12.5 bit
+
+  6 bit for 64 existentially quantified variables
+  6 bit for 64 universally quantified variables
+
+###### Sane
+
+  1 bit for 2 signs
+  3 bit for 8 predicates of maximum arity 4
+
+leaves (64 - 1 - 3) / 4 = 15 bit
+ 
+  5 bit for   32 existentially quantified variables
+ 10 bit for 1024 universally quantified variables
+
+###### Tight
+
+  1 bit for 2 signs
+  3 bit for 8 predicates of maximum arity 3
+
+leaves (64 - 1 - 3) / 3 = 20 bit
+ 
+ 10 bit for 1024 existentially quantified variables
+ 10 bit for 1024 universally quantified variables
 
 #### Unification
 
@@ -189,6 +220,16 @@ https://vprover.github.io/index.html
 https://github.com/shnarazk/splr
 https://github.com/jix/varisat (generates proofs)
 https://github.com/togatoga/screwsat
+
+## Inputs
+
+http://www.tptp.org/CASC/27/SelectedProblems.html
+http://www.tptp.org/CASC/26/SelectedProblems.html
+http://www.tptp.org/CASC/25/SelectedProblems.html
+http://www.tptp.org/CASC/24/SelectedProblems.html
+
+Parse those inputs, then find out their size
+(number of predicate symbols, maximum arity, number of variables).
 
 ## Useful Crates
 
