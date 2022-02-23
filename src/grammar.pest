@@ -1,0 +1,58 @@
+ASCII_ALPHANUMERIC_LOWER = _{ ASCII_DIGIT | ASCII_ALPHA_LOWER }
+
+WHITESPACE = _{ " " | "\t" | NEWLINE }
+
+// Line comments starting with "%".
+LINE_COMMENT = @{ "%" ~ (!NEWLINE ~ ANY)* ~ NEWLINE }
+//COMMENT = _{ "/*" ~ (!"*/" ~ ANY)* ~ "*/" }
+
+// Natural numbers starting at 1 inclusive.
+natural1 = _{ ASCII_NONZERO_DIGIT ~ ASCII_DIGIT* }
+
+// Natural numbers starting at 0 inclusive.
+// Zero must be written exactly "0", leading zeroes are not allowed.
+natural0 = _{ "0" | natural1 }
+
+// Integer numbers, positive and negative.
+// Zero must be written exactly "0", leading zeroes and "-0" are not allowed.
+integer = _{ "0" | ("-"? ~ natural1) }
+
+rif = { "R" | "I" | "F" }
+
+variable = { ("x" | "y" | "z" | "u" | "v" | "w") ~ ASCII_ALPHANUMERIC_LOWER* ~ rif? }
+
+constant = { ("a" | "b" | "c" | "d") ~ ASCII_ALPHANUMERIC_LOWER* ~ rif? }
+
+term = { variable | constant | natural0 }
+
+catom = { (le | ge | lt | gt | eq | ne) ~ "(" ~ cterm ~ "," ~ cterm ~ ")" }
+    le = { "<=" | "≤" }
+    ge = { ">=" | "≥" }
+    lt = { "<" }
+    gt = { ">" }
+    eq = { "=" }
+    ne = { "!=" | "≠" }
+    cterm = { op | term }
+        op  = { (sub ~ natural1)
+              | (sub ~ "(" ~ cterm ~ "," ~ cterm ~ ")")
+              | ((add | mul) ~ "(" ~ cterm ~ "," ~ cterm ~ ("," ~ cterm)* ~ ")") }
+        add = { "+" }
+        sub = { "-" }
+        mul = { "*" }
+
+fatom = { predicate ~ "(" ~ (term ~ ("," ~ term)*)* ~ ")" }
+    predicate = { ASCII_ALPHA_UPPER ~ ASCII_ALPHANUMERIC* }
+
+clause = { "g"? ~ (constraint ~ pipes)? ~ atoms? ~ arrow ~ atoms? ~ "." }
+    constraint = _{ catom ~ ("," ~ catom)* }
+    atoms      = _{ fatom ~ ("," ~ fatom)* }
+
+tclause = { "t" ~ catom ~ pipes ~ arrow ~ fatom ~ "." }
+
+pipes = _{ "∥" | "||" }
+arrow = { "->" | "→" }
+
+preamble = { item ~ ("," ~ item)* }
+    item = { "p" ~ "(" ~ (variable | constant) ~ ":" ~ rif ~ ")" }
+
+input = _{ SOI ~ LINE_COMMENT* ~ preamble? ~ (LINE_COMMENT | clause | tclause)* ~ EOI }

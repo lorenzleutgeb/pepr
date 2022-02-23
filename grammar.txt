@@ -1,0 +1,45 @@
+% Default sort for all variables and constants is "R"
+% Default sort for all predicates with an argument of sort "R" or "I" is the
+% arithmetic type including all arithmetic sorts
+
+% Example: <(+(-(*(3,x),*(x,e(y,2))),6),5),  =(y,z) || P(x,y), Q(z,w) -> R(a,w), Q(z,z).
+
+% Input
+<SUPLOGin>   ::= <comment>* <preamble> <clause>* [<gclause>]
+
+% Preamble and Comments
+<preamble>   ::= [["p("<var>":"<RIF>")" | "p("<const>":"<RIF>")"] [","["p("<var>":"<RIF>")" | "p("<const>":"<RIF>")"]]*]
+<comment>    ::= "%" <any string until EOL>
+
+% Variables and constants (occur in constraints as well as in clauses)
+<RIF>        ::= "R" | "I" | "F" 
+<const>      ::= <abcd>[[<lowercasestring>] | [<RIF>] | [<number>]]*
+<var>        ::= <xyzuvw>[[<lowercasestring>] | [<RIF>] | [<number>]]*
+<abcd>       ::= "a" | "b" | "c" | "d" 
+<xyzuvw>     ::= "x" | "y" | "z" | "u" | "v" | "w" 
+
+% Constrained Clauses
+<clause>     ::= [<constraint> "||"] <atoms> -> <atoms> "."
+<gclause>    ::= g [<constraint> "||"] <atoms> -> <atoms> "."
+
+% BS terms, atoms, literals
+<atoms>      ::= [<atom> ["," <atom>]*]
+<atom>       ::= <upercaseletter>[<number> | <letter>]*"("[<terms>]")"
+<terms>      ::= <term> ["," <term>]*
+<term>       ::= <var> | <const>
+
+
+% Arithmetic terms, atoms, relations (predicates) and constraints.
+<catom>      ::= <crel>"("<cterm>,<cterm>")"
+<crel>       ::= "<" | ">" | "=" | "<=" | ">=" | "!="
+<cterm>      ::= "+("<cterm>,<cterm>[,<cterm>]*")"
+               | "*("<cterm>,<cterm>[,<cterm>]*")"
+	       | "-("<cterm>,<cterm>")"
+	       | "-"<number>
+	       | "e("<var>,<number>")"
+	       | "/("<cterm>,<number>")"
+	       | <number> | <var> | <const>
+<constraint> ::= <catom> ["," <catom>]*
+
+% Numbers
+<number>     ::= ["0" | "1" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9"]+
