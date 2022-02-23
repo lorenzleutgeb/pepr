@@ -1,7 +1,4 @@
-use crate::{
-    substitution::{self, Substitution},
-    Clause,
-};
+use crate::{substitution::Substitution, Clause};
 
 impl Clause {
     fn subsumes(&self, other: &Clause, substitution: &mut Substitution) -> bool {
@@ -9,9 +6,9 @@ impl Clause {
             return false;
         }
         substitution.start();
-        let result = self.subsumes_rec(&other, substitution, 0);
+        let result = self.subsumes_rec(other, substitution, 0);
         substitution.stop();
-        return result;
+        result
     }
 
     fn subsumes_rec(&self, other: &Clause, substitution: &mut Substitution, index: usize) -> bool {
@@ -36,13 +33,12 @@ impl Clause {
             substitution.backtrack(snapshot);
         }
 
-        return false;
+        false
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use std::env::VarError;
 
     use itertools::Itertools;
 
@@ -57,7 +53,7 @@ mod tests {
     fn simple() {
         let x0 = Variable::from_index(0);
         let c0: Term = Constant::from_index(0).into();
-        let c1: Term = Constant::from_index(0).into();
+        let _c1: Term = Constant::from_index(0).into();
 
         let subsumes = Clause::dummy(
             vec![Atom {
@@ -70,7 +66,7 @@ mod tests {
         let subsumed = Clause::dummy(
             vec![Atom {
                 predicate: 0,
-                terms: vec![c0.into()].into_boxed_slice(),
+                terms: vec![c0].into_boxed_slice(),
             }],
             vec![],
         );
@@ -84,7 +80,7 @@ mod tests {
     fn simple_negative() {
         let x0 = Variable::from_index(0);
         let c0: Term = Constant::from_index(0).into();
-        let c1: Term = Constant::from_index(0).into();
+        let _c1: Term = Constant::from_index(0).into();
 
         let subsumed = Clause::dummy(
             vec![Atom {
@@ -97,7 +93,7 @@ mod tests {
         let subsumes = Clause::dummy(
             vec![Atom {
                 predicate: 0,
-                terms: vec![c0.into()].into_boxed_slice(),
+                terms: vec![c0].into_boxed_slice(),
             }],
             vec![],
         );
@@ -205,7 +201,7 @@ mod tests {
 
         let r = Clause::dummy(
             vec![],
-            itertools::iproduct!(truth.clone(), truth.clone(), truth.clone())
+            itertools::iproduct!(truth.clone(), truth.clone(), truth)
                 .filter(|assignment| {
                     assignment.0 .0 == assignment.0 .1
                         || assignment.1 .0 == assignment.1 .1

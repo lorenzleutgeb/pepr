@@ -1,4 +1,4 @@
-use std::{convert::TryInto, intrinsics::transmute, num::NonZeroUsize, ptr::NonNull};
+use std::{convert::TryInto, num::NonZeroUsize};
 
 const TERM_MASK_BITS: usize = 1;
 const TERM_MASK: usize = 0b1;

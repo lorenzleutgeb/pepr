@@ -1,4 +1,4 @@
-use std::{convert::TryInto, fmt::Debug};
+use std::convert::TryInto;
 
 use crate::{
     symbols::{Term, Variable},
@@ -140,14 +140,14 @@ impl Substitution {
 
     fn match_terms(&mut self, left: &Term, right: &Term) -> bool {
         if left == right {
-            return true;
+            true
         } else {
             match (*left).try_into() {
                 Ok(v) => match self.get(v) {
                     Some(mapped) => mapped == (*right),
                     None => {
                         self.set(v, *right);
-                        return true;
+                        true
                     }
                 },
                 _ => false,
@@ -183,7 +183,7 @@ impl Substitution {
             return true;
         }
 
-        return false;
+        false
     }
 }
 

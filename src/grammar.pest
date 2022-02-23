@@ -11,7 +11,7 @@ natural1 = _{ ASCII_NONZERO_DIGIT ~ ASCII_DIGIT* }
 
 // Natural numbers starting at 0 inclusive.
 // Zero must be written exactly "0", leading zeroes are not allowed.
-natural0 = _{ "0" | natural1 }
+natural0 = { "0" | natural1 }
 
 // Integer numbers, positive and negative.
 // Zero must be written exactly "0", leading zeroes and "-0" are not allowed.

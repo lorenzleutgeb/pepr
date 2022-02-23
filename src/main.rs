@@ -9,28 +9,19 @@ mod substitution;
 mod subsumption;
 mod symbols;
 
-use clap::{Parser as ClapParser, Subcommand};
-use pest::error::Error as PestError;
-use pest::iterators::{Pair, Pairs};
-use pest::{Parser as PestParser, Position, Span};
-
+use crate::symbols::Term;
+use clap::Parser as ClapParser;
 use cli::{Cli, Commands};
 use parser::{FTCNFParser, Rule};
-
-use string_interner::backend::BucketBackend;
-use string_interner::{StringInterner, Symbol};
-use symbols::{Constant, Variable};
-
-use core::panic;
+use pest::Parser as PestParser;
 use std::convert::TryInto;
-use std::fmt::{format, Display};
+use std::fmt::Display;
 use std::fs;
 use std::iter::IntoIterator;
-use std::num::IntErrorKind;
 use std::process;
-use std::sync::Arc;
-
-use crate::symbols::Term;
+use string_interner::backend::BucketBackend;
+use string_interner::StringInterner;
+use symbols::{Constant, Variable};
 
 type Interner<T> = StringInterner<BucketBackend<T>>;
 
@@ -215,6 +206,19 @@ enum CPredicate {
     Gt,
 }
 
+impl Display for CPredicate {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            CPredicate::Eq => write!(f, "="),
+            CPredicate::Ne => write!(f, "!="),
+            CPredicate::Le => write!(f, "<="),
+            CPredicate::Lt => write!(f, "<"),
+            CPredicate::Ge => write!(f, ">="),
+            CPredicate::Gt => write!(f, ">"),
+        }
+    }
+}
+
 #[derive(Debug, Clone)]
 enum CTerm {
     Idy(Term),
@@ -248,7 +252,7 @@ impl<'a> IntoIterator for &'a Atom {
     type IntoIter = std::slice::Iter<'a, Term>;
 
     fn into_iter(self) -> Self::IntoIter {
-        self.terms.into_iter()
+        self.terms.iter()
     }
 }
 
@@ -257,17 +261,40 @@ struct Clauses {
 }
 
 impl Symbols {
+    fn format_cterm(&self, term: &CTerm) -> String {
+        match &term {
+            CTerm::Idy(t) => self.format_term(t),
+            CTerm::Add(l, r) => format!("+({}, {})", self.format_term(l), self.format_term(r)),
+            CTerm::Mul(l, r) => format!("*({}, {})", self.format_term(l), self.format_term(r)),
+            CTerm::Sub(l, r) => format!("-({}, {})", self.format_term(l), self.format_term(r)),
+            CTerm::Neg(t) => format!("-{}", self.format_term(t)),
+        }
+    }
+
+    fn format_catom(&self, atom: &CAtom) -> String {
+        format!(
+            "{} {} {}",
+            self.format_term(&atom.left),
+            atom.predicate,
+            self.format_cterm(&atom.right),
+        )
+    }
+
+    fn format_term(&self, t: &Term) -> String {
+        match (*t).try_into() {
+            Ok(c) => self.constants.interner.resolve(c).unwrap().to_owned(),
+            Err(_) => match (*t).try_into() {
+                Ok::<Variable, _>(v) => v.to_string(),
+                Err(_) => unreachable!(),
+            },
+        }
+    }
+
     fn format(&self, atom: &Atom) -> String {
         let terms = atom
             .terms
             .iter()
-            .map(|&t| match t.try_into() {
-                Ok(c) => self.constants.interner.resolve(c).unwrap().to_owned(),
-                Err(_) => match t.try_into() {
-                    Ok::<Variable, _>(v) => v.to_string(),
-                    Err(_) => unreachable!(),
-                },
-            })
+            .map(|&t| self.format_term(&t))
             .collect::<Vec<String>>()
             .join(", ");
         format!(
@@ -279,6 +306,19 @@ impl Symbols {
 
     fn format_clause(&self, clause: &Clause) -> String {
         let (premises, conclusions) = clause.split_at_arrow();
+
+        let constraint_str = if clause.constraint.atoms.is_empty() {
+            String::from("")
+        } else {
+            clause
+                .constraint
+                .atoms
+                .iter()
+                .map(|atom| self.format_catom(atom))
+                .collect::<Vec<String>>()
+                .join(", ")
+                + " ∥ "
+        };
 
         let premise_str = premises
             .iter()
@@ -299,8 +339,6 @@ impl Symbols {
             .collect::<Vec<String>>()
             .join("");
 
-        let constraint_str = if true { "… ∥ " } else { "" };
-
         format!(
             "{}:{}:{}:{}:{}: {}{} → {}.",
             clause.id,
@@ -315,7 +353,9 @@ impl Symbols {
     }
 }
 
+#[derive(Debug)]
 struct Constraint {
+    atoms: Box<[CAtom]>,
     problem: minilp::Problem,
 }
 
@@ -323,7 +363,7 @@ struct Constraint {
 #[derive(Debug)]
 struct Clause {
     id: usize,
-    constraint: minilp::Problem,
+    constraint: Constraint,
     atoms: Box<[Atom]>,
 
     /// Position of the arrow which splits
@@ -345,7 +385,10 @@ impl Clause {
             .into_boxed_slice();
         Clause {
             id: 0,
-            constraint: minilp::Problem::new(minilp::OptimizationDirection::Minimize),
+            constraint: Constraint {
+                atoms: vec![].into_boxed_slice(),
+                problem: minilp::Problem::new(minilp::OptimizationDirection::Minimize),
+            },
             atoms,
             arrow,
             typs: vec![].into_boxed_slice(),

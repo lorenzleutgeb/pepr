@@ -1,28 +1,24 @@
-use core::panic;
-use std::fmt::Debug;
-
-use itertools::Itertools;
-use minilp::Problem;
-use pest::{
-    iterators::{Pair, Pairs},
-    Position, Span,
-};
-use string_interner::Symbol;
-
+use crate::Constraint;
 use crate::{
     bail, debug_unreachable, symbols::Term, Atom, CAtom, CPredicate, CTerm, Clause, ConstantData,
     Constants, Interner, Parents, PredicateData, Predicates, State, Symbols, Typ, VariableData,
     Variables,
 };
-
+use minilp::Problem;
 use pest::error::Error as PestError;
+use pest::{
+    iterators::{Pair, Pairs},
+    Position, Span,
+};
+use std::fmt::Debug;
+use string_interner::Symbol;
 
 #[derive(pest_derive::Parser)]
 #[grammar = "grammar.pest"]
 pub struct FTCNFParser;
 
-fn parse_constraint(symbols: &mut Symbols, pair: Pair<Rule>) {
-    let problem = Problem::new(minilp::OptimizationDirection::Minimize);
+fn parse_constraint(_symbols: &mut Symbols, _pair: Pair<Rule>) {
+    let _problem = Problem::new(minilp::OptimizationDirection::Minimize);
 }
 
 /*
@@ -132,7 +128,7 @@ impl State {
             clauses: vec![],
         };
 
-        for pair in pairs.into_iter() {
+        for pair in pairs {
             match pair.as_rule() {
                 Rule::preamble => {
                     parse_preamble(&mut state.symbols, pair);
@@ -157,15 +153,11 @@ impl Clause {
         };
         let mut arrow: usize = 0;
         let mut atoms: Vec<Atom> = vec![];
-        let mut constraint: bool = false;
         let mut catoms: Vec<CAtom> = vec![];
 
         for inner in pair.into_inner() {
             match inner.as_rule() {
-                Rule::catom => {
-                    constraint = true;
-                    catoms.push(CAtom::parse(&mut state.symbols, variables, inner))
-                }
+                Rule::catom => catoms.push(CAtom::parse(&mut state.symbols, variables, inner)),
                 Rule::arrow => {
                     arrow = atoms.len();
                 }
@@ -178,7 +170,10 @@ impl Clause {
 
         let clause = Clause {
             id: state.clauses.len(),
-            constraint: Problem::new(minilp::OptimizationDirection::Minimize),
+            constraint: Constraint {
+                atoms: catoms.into_boxed_slice(),
+                problem: minilp::Problem::new(minilp::OptimizationDirection::Minimize),
+            },
             atoms: atoms.into_boxed_slice(),
             arrow,
             parents: Parents::Input,
@@ -207,7 +202,7 @@ impl CPredicate {
 
 impl CAtom {
     fn parse(symbols: &mut Symbols, clause_variables: &mut Variables, pair: Pair<Rule>) -> CAtom {
-        let mut pairs = pair.into_inner().into_iter();
+        let mut pairs = pair.into_inner();
 
         CAtom {
             predicate: CPredicate::parse(pairs.next().unwrap().as_rule()),
@@ -248,18 +243,14 @@ impl CTerm {
             } else {
                 CTerm::Sub(args[0], args[1])
             }
+        } else if args.len() != 2 {
+            todo!()
+        } else if op == Some(Rule::add) {
+            CTerm::Add(args[0], args[1])
+        } else if op == Some(Rule::mul) {
+            CTerm::Mul(args[0], args[1])
         } else {
-            if args.len() != 2 {
-                todo!()
-            } else {
-                if op == Some(Rule::add) {
-                    CTerm::Add(args[0], args[1])
-                } else if op == Some(Rule::mul) {
-                    CTerm::Mul(args[0], args[1])
-                } else {
-                    debug_unreachable!()
-                }
-            }
+            debug_unreachable!()
         }
     }
 
@@ -350,12 +341,11 @@ impl Atom {
 
 impl Term {
     fn parse(symbols: &mut Symbols, clause_variables: &mut Variables, pair: Pair<Rule>) -> Term {
-        let span = pair.as_span();
+        let _span = pair.as_span();
         for inner in pair.into_inner() {
-            let innerspan = inner.as_span();
+            let _innerspan = inner.as_span();
             match inner.as_rule() {
-                Rule::constant | Rule::integer => {
-                    println!("reached integer");
+                Rule::constant | Rule::natural0 => {
                     return symbols
                         .constants
                         .interner
@@ -402,8 +392,7 @@ fn bail_from_pos(message: String, code: i32, pos: Position) {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use pest::error::Error;
-    use pest::iterators::Pairs;
+
     use pest::Parser;
 
     fn ok(rule: Rule, s: &str) {
