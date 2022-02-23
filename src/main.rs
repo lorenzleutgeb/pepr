@@ -1,3 +1,7 @@
+// There are lots of unused functions that I sketched,
+// let them stick around.
+#![allow(dead_code)]
+
 mod cli;
 mod macros;
 mod parser;
