@@ -1,9 +1,6 @@
 use std::convert::TryInto;
 
-use crate::{
-    symbols::{Term, Variable},
-    Atom,
-};
+use crate::{symbols::Term, Atom};
 
 const MAX_VARS: usize = 256;
 
@@ -14,12 +11,12 @@ struct Mapping {
 }
 
 struct History {
-    variable: Variable,
+    variable: u32,
     previous: Option<Term>,
 }
 
 impl History {
-    fn identity(variable: Variable) -> History {
+    fn identity(variable: u32) -> History {
         History {
             variable,
             previous: None,
@@ -50,25 +47,30 @@ impl Substitution {
     }
 
     pub fn start(&mut self) {
-        debug_assert!(!self.active);
-        if cfg!(debug_assertions) {
+        #[cfg(debug_assertions)]
+        {
+            assert!(!self.active);
             self.active = true;
         }
         self.generation = self.generation.wrapping_add(1);
     }
 
     pub fn stop(&mut self) {
-        debug_assert!(self.active);
-        if cfg!(debug_assertions) {
+        #[cfg(debug_assertions)]
+        {
+            assert!(self.active);
             self.active = false;
         }
         self.history.clear();
     }
 
-    fn get(&self, variable: Variable) -> Option<Term> {
-        debug_assert!(self.active);
+    fn get(&self, variable: u32) -> Option<Term> {
+        #[cfg(debug_assertions)]
+        {
+            assert!(self.active);
+        }
 
-        let i = variable.to_index();
+        let i = variable as usize;
 
         assert!(i <= MAX_VARS);
 
@@ -81,13 +83,18 @@ impl Substitution {
         }
     }
 
-    fn set(&mut self, variable: Variable, term: Term) {
-        debug_assert!(self.active);
+    fn set(&mut self, variable: u32, term: Term) {
+        #[cfg(debug_assertions)]
+        {
+            assert!(self.active);
+            if let Term::Variable(v, _) = term {
+                assert_ne!(v, variable)
+            }
+        }
 
-        let i = variable.to_index();
+        let i = variable as usize;
 
         assert!(i <= MAX_VARS);
-        debug_assert!(Term::from(variable) != term);
 
         if self.mapping[i].generation == self.generation {
             self.history.push(History {
@@ -106,17 +113,23 @@ impl Substitution {
 
     #[inline]
     pub fn snapshot(&self) -> usize {
-        debug_assert!(self.active);
+        #[cfg(debug_assertions)]
+        {
+            assert!(self.active);
+        }
         self.history.len()
     }
 
     pub fn backtrack(&mut self, snapshot: usize) {
-        debug_assert!(self.active);
-        debug_assert!(snapshot <= self.history.len());
+        #[cfg(debug_assertions)]
+        {
+            assert!(self.active);
+            assert!(snapshot <= self.history.len());
+        }
 
         while self.history.len() != snapshot {
             let top = self.history.pop().unwrap();
-            let i = top.variable.to_index();
+            let i = top.variable as usize;
 
             debug_assert!(self.mapping[i].generation == self.generation);
 
@@ -142,9 +155,9 @@ impl Substitution {
         if left == right {
             true
         } else {
-            match (*left).try_into() {
-                Ok(v) => match self.get(v) {
-                    Some(mapped) => mapped == (*right),
+            match *left {
+                Term::Variable(v, _) => match self.get(v) {
+                    Some(mapped) => mapped == *right,
                     None => {
                         self.set(v, *right);
                         true
@@ -154,56 +167,28 @@ impl Substitution {
             }
         }
     }
-
-    fn unify_atoms(&mut self, left: &Atom, right: &Atom) -> bool {
-        if left.predicate != right.predicate || left.len() != right.len() {
-            false
-        } else {
-            left.into_iter()
-                .zip(right.into_iter())
-                .map(|pair| self.unify(pair.0, pair.1))
-                .all(std::convert::identity)
-        }
-    }
-
-    fn unify(&mut self, left: &Term, right: &Term) -> bool {
-        if left == right {
-            return true;
-        }
-
-        let left_var: Result<Variable, ()> = (*left).try_into();
-        if left_var.is_ok() {
-            self.set(left_var.unwrap(), *right);
-            return true;
-        }
-
-        let right_var: Result<Variable, ()> = (*right).try_into();
-        if right_var.is_ok() {
-            self.set(right_var.unwrap(), *left);
-            return true;
-        }
-
-        false
-    }
 }
 
 impl Drop for Substitution {
     fn drop(&mut self) {
-        debug_assert!(std::thread::panicking() || !self.active)
+        #[cfg(debug_assertions)]
+        {
+            debug_assert!(std::thread::panicking() || !self.active)
+        }
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use crate::symbols::Constant;
+    use crate::Typ;
 
     use super::*;
 
     #[test]
     fn backtracking() {
-        let x0 = Variable::from_index(0);
-        let c0: Term = Constant::from_index(0).into();
-        let c1: Term = Constant::from_index(1).into();
+        let x0 = 0;
+        let c0: Term = Term::Constant(0, Typ::R);
+        let c1: Term = Term::Constant(1, Typ::R);
 
         let s = &mut Substitution::new();
         s.start();
@@ -220,21 +205,21 @@ mod tests {
     #[test]
     #[should_panic]
     fn identity() {
-        let x0 = Variable::from_index(0);
+        let x0 = 0;
         let s = &mut Substitution::new();
         s.start();
-        s.set(x0, x0.into());
+        s.set(x0, Term::Variable(x0, Typ::R));
         s.stop();
     }
 
     #[test]
     fn match_positive() {
-        let x: Variable = Variable::from_index(0);
-        let a: Constant = Constant::from_index(0);
+        let x = 0;
+        let a = Term::Constant(0, Typ::R);
 
         let l: Atom = Atom {
             predicate: 1,
-            terms: vec![x.into()].into_boxed_slice(),
+            terms: vec![Term::Variable(x, Typ::R)].into_boxed_slice(),
         };
         let r: Atom = Atom {
             predicate: 1,
@@ -251,8 +236,8 @@ mod tests {
     #[test]
     #[should_panic]
     fn match_negative() {
-        let x: Variable = Variable::from_index(0);
-        let a: Constant = Constant::from_index(0);
+        let x = 0;
+        let a = Term::Constant(0, Typ::R);
 
         let l: Atom = Atom {
             predicate: 1,
@@ -260,7 +245,7 @@ mod tests {
         };
         let r: Atom = Atom {
             predicate: 1,
-            terms: vec![x.into()].into_boxed_slice(),
+            terms: vec![Term::Variable(x, Typ::R)].into_boxed_slice(),
         };
 
         let s = &mut Substitution::new();

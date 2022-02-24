@@ -1,14 +1,60 @@
-use std::{convert::TryInto, num::NonZeroUsize};
+use std::{
+    convert::TryInto,
+    num::{NonZeroU32, NonZeroUsize},
+};
+
+use string_interner::Symbol;
+
+use crate::Typ;
+
+pub type Variable = u32;
+
+pub type Constant = u32;
+
+pub type Integer = i32;
 
 const TERM_MASK_BITS: usize = 1;
 const TERM_MASK: usize = 0b1;
 
-#[repr(transparent)]
 #[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct Term {
-    value: NonZeroUsize,
+pub enum Term {
+    Variable(Variable, Typ),
+    Constant(Constant, Typ),
+    Integer(Integer),
 }
 
+#[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct SymbolU32 {
+    value: NonZeroU32,
+}
+
+impl SymbolU32 {
+    pub fn get(self) -> u32 {
+        self.value.get() - 1
+    }
+}
+
+impl From<u32> for SymbolU32 {
+    fn from(value: u32) -> Self {
+        Self {
+            value: <NonZeroU32>::new(value.wrapping_add(1)).unwrap(),
+        }
+    }
+}
+
+impl Symbol for SymbolU32 {
+    #[inline]
+    fn try_from_usize(index: usize) -> Option<Self> {
+        <NonZeroU32>::new((index as u32).wrapping_add(1)).map(|value| Self { value })
+    }
+
+    #[inline]
+    fn to_usize(self) -> usize {
+        self.value.get() as usize - 1
+    }
+}
+
+/*
 impl From<Variable> for Term {
     #[inline]
     fn from(variable: Variable) -> Self {
@@ -99,12 +145,6 @@ impl string_interner::Symbol for Variable {
     }
 }
 
-impl ToString for Variable {
-    fn to_string(&self) -> String {
-        "_".to_owned() + &self.to_index().to_string()
-    }
-}
-
 #[repr(transparent)]
 #[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct Constant {
@@ -152,19 +192,22 @@ impl string_interner::Symbol for Constant {
     }
 }
 
+*/
 struct Predicate(NonZeroUsize);
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
+    use std::mem::size_of;
+
     #[test]
-    fn disjoint() {
-        for term in 1..32usize {
-            let t = Term {
-                value: NonZeroUsize::new(term).unwrap(),
-            };
-            assert!(Variable::is(t) ^ Constant::is(t))
-        }
+    fn term_fits_pointer() {
+        assert!(size_of::<Term>() == size_of::<usize>());
+    }
+
+    #[test]
+    fn term_option_is_free() {
+        assert!(size_of::<Term>() == size_of::<Option<Term>>());
     }
 }

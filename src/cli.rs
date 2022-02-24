@@ -1,32 +1,35 @@
-use clap::{Parser, Subcommand};
+use clap::{AppSettings, Parser, Subcommand};
+use clap_verbosity_flag::Verbosity;
+use std::fmt::Write;
 use std::path::PathBuf;
+use std::{fmt::format, mem::size_of};
+
+use crate::symbols::{Constant, Integer, Term, Variable};
 
 #[derive(Parser)]
-#[clap(author, version, about, long_about = None)]
+#[clap(author, version, about, long_about = None, long_version = version())]
 pub struct Cli {
-    /// Optional name to operate on
-    pub name: Option<String>,
+    #[clap(flatten)]
+    pub verbosity: Verbosity,
 
-    /// Sets a custom config file
     #[clap(short, long, parse(from_os_str), value_name = "FILE")]
-    pub config: Option<PathBuf>,
-
-    /// Turn debugging information on
-    #[clap(short, long, parse(from_occurrences))]
-    pub debug: usize,
-
-    #[clap(subcommand)]
-    pub command: Option<Commands>,
+    pub input: PathBuf,
 }
 
-#[derive(Subcommand)]
-pub enum Commands {
-    /// Runs saturation prover
-    Horn {
-        /// Sets a custom config file
-        #[clap(short, long, parse(from_os_str), value_name = "FILE")]
-        input: PathBuf,
-    },
-    /// hammers the input to specified output format.
-    Hammer {},
+fn version() -> &'static str {
+    Box::leak(Box::new(format!(
+        "{}
+Sizes in bytes:
+  Term               {}
+  Variable           {}
+  Symbolic Constant  {}
+  Integer  Constant  {} (min. {}, max. {})",
+        env!("CARGO_PKG_VERSION"),
+        size_of::<Term>(),
+        size_of::<Variable>(),
+        size_of::<Constant>(),
+        size_of::<Integer>(),
+        Integer::MIN,
+        Integer::MAX
+    )))
 }

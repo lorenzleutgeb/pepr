@@ -42,18 +42,14 @@ mod tests {
 
     use itertools::Itertools;
 
-    use crate::{
-        symbols::{Constant, Term, Variable},
-        Atom,
-    };
+    use crate::{symbols::Term, Atom, Typ};
 
     use super::*;
 
     #[test]
     fn simple() {
-        let x0 = Variable::from_index(0);
-        let c0: Term = Constant::from_index(0).into();
-        let _c1: Term = Constant::from_index(0).into();
+        let x0 = Term::Variable(0, Typ::F);
+        let c0 = Term::Constant(0, Typ::F);
 
         let subsumes = Clause::dummy(
             vec![Atom {
@@ -78,9 +74,8 @@ mod tests {
 
     #[test]
     fn simple_negative() {
-        let x0 = Variable::from_index(0);
-        let c0: Term = Constant::from_index(0).into();
-        let _c1: Term = Constant::from_index(0).into();
+        let x0 = Term::Variable(0, Typ::F);
+        let c0 = Term::Constant(0, Typ::F);
 
         let subsumed = Clause::dummy(
             vec![Atom {
@@ -106,12 +101,12 @@ mod tests {
     #[test]
     fn sat() {
         // Boolean atoms.
-        let x = Variable::from_index(0);
-        let y = Variable::from_index(1);
-        let z = Variable::from_index(2);
+        let x = Term::Variable(0, Typ::F);
+        let y = Term::Variable(1, Typ::F);
+        let z = Term::Variable(2, Typ::F);
 
-        let c_false = Constant::from_index(0);
-        let c_true = Constant::from_index(1);
+        let c_false = Term::Constant(0, Typ::F);
+        let c_true = Term::Constant(1, Typ::F);
 
         let r: usize = 0;
 

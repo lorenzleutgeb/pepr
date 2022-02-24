@@ -2,34 +2,54 @@
 // let them stick around.
 #![allow(dead_code)]
 
+mod bakery;
 mod cli;
+mod fmt;
+mod la;
 mod macros;
 mod parser;
 mod substitution;
 mod subsumption;
 mod symbols;
 
-use crate::symbols::Term;
+use crate::fmt::DisplayWithSymbols;
+use crate::symbols::{Constant, Integer, Term, Variable};
 use clap::Parser as ClapParser;
-use cli::{Cli, Commands};
+use clap_verbosity_flag::Verbosity;
+use cli::Cli;
+use core::mem::size_of;
+use good_lp::{Expression, IntoAffineExpression, ProblemVariables, VariableDefinition};
+use log::{debug, error, info, trace, warn};
 use parser::{FTCNFParser, Rule};
 use pest::Parser as PestParser;
-use std::convert::TryInto;
 use std::fmt::Display;
 use std::fs;
 use std::iter::IntoIterator;
+use std::ops::Mul;
 use std::process;
+use std::str::FromStr;
+use std::{convert::TryInto, ops::Deref};
 use string_interner::backend::BucketBackend;
 use string_interner::StringInterner;
-use symbols::{Constant, Variable};
+use symbols::SymbolU32;
 
 type Interner<T> = StringInterner<BucketBackend<T>>;
 
-#[derive(Debug, PartialEq, Eq, Clone, Copy)]
-enum Typ {
+#[derive(Debug, PartialEq, Eq, PartialOrd, Clone, Copy, Ord, Hash)]
+pub enum Typ {
     R,
     I,
     F,
+}
+
+impl Typ {
+    /// Decides subtyping relation.
+    fn contains(self, other: Typ) -> bool {
+        match (self, other) {
+            (Typ::R, Typ::I) => true,
+            _ => false,
+        }
+    }
 }
 
 #[derive(Debug)]
@@ -78,53 +98,38 @@ impl Display for Typ {
 fn main() {
     let cli = Cli::parse();
 
-    // You can check the value provided by positional arguments, or option arguments
-    if let Some(name) = cli.name.as_deref() {
-        println!("Value for name: {}", name);
-    }
+    env_logger::Builder::new()
+        .filter_level(cli.verbosity.log_level_filter())
+        .init();
 
-    if let Some(config_path) = cli.config.as_deref() {
-        println!("Value for config: {}", config_path.display());
-    }
-
-    // You can see how many times a particular flag or argument occurred
-    // Note, only flags can have multiple occurrences
-    match cli.debug {
-        0 => println!("Debug mode is off"),
-        1 => println!("Debug mode is kind of on"),
-        2 => println!("Debug mode is on"),
-        _ => println!("Don't be crazy"),
-    }
-
-    // You can check for the existence of subcommands, and if found use their
-    // matches just as you would the top level cmd
-    match &cli.command {
-        Some(Commands::Horn { input }) => {
-            let unparsed_file = fs::read_to_string(input).expect("cannot read file");
-            match FTCNFParser::parse(Rule::input, &unparsed_file) {
-                Ok(parse) => {
-                    // println!("{:?}", parse);
-                    let state = State::parse(parse);
-                    resolution(state);
-                }
-                Err(e) => {
-                    eprintln!("Parsing error!");
-                    eprintln!("{}", e);
-                    process::exit(1);
-                }
-            }
+    let unparsed_file = fs::read_to_string(cli.input).expect("cannot read file");
+    match FTCNFParser::parse(Rule::input, &unparsed_file) {
+        Ok(parse) => {
+            let state = State::parse(parse);
+            tautology_check(&state);
+            resolution(&state);
         }
-        Some(Commands::Hammer {}) => {
-            println!("Hammertime!");
-        }
-        None => {
-            eprintln!("Please specify a subcommand.");
+        Err(e) => {
+            eprintln!("Parsing error!");
+            eprintln!("{}", e);
             process::exit(1);
         }
     }
 }
 
-fn resolution(state: State) {
+fn tautology_check(state: &State) {
+    for clause in state.clauses.iter() {
+        println!("{}", clause.display(&state.symbols));
+        match clause.solve(&state.symbols) {
+            Some(solution) => {
+                println!("{:?}", &solution);
+            }
+            None => {}
+        }
+    }
+}
+
+fn resolution(state: &State) {
     for unit in state.clauses.iter() {
         if !unit.is_unit() {
             continue;
@@ -155,6 +160,10 @@ struct State {
     clauses: Vec<Clause>,
 }
 
+impl State {
+    fn tautology_check(&mut self) {}
+}
+
 struct PredicateData {
     arity: usize,
     // TODO: Also store the types of arguments.
@@ -177,7 +186,7 @@ struct ConstantData {
 }
 
 struct Constants {
-    interner: Interner<Constant>,
+    interner: Interner<SymbolU32>,
     data: Vec<ConstantData>,
 }
 
@@ -192,7 +201,7 @@ struct VariableData {
 }
 
 struct Variables {
-    interner: Interner<Variable>,
+    interner: Interner<SymbolU32>,
     data: Vec<VariableData>,
 }
 
@@ -221,17 +230,26 @@ impl Display for CPredicate {
 
 #[derive(Debug, Clone)]
 enum CTerm {
-    Idy(Term),
-    Neg(Term),
-    Add(Term, Term),
-    Sub(Term, Term),
-    Mul(Term, Term),
+    /// Injection of [Term].
+    Inj(Term),
+
+    /// Negation of a [CTerm].
+    Neg(Box<[CTerm; 1]>),
+
+    /// Addition on [CTerm]. Restricted to 2 elements for simplicity.
+    Add(Box<[CTerm; 2]>),
+
+    /// Subtraction on [CTerm].
+    Sub(Box<[CTerm; 2]>),
+
+    /// Multiplication on [CTerm]. Restricted to 2 elements for simplicity.
+    Mul(Box<[CTerm; 2]>),
 }
 
 #[derive(Debug, Clone)]
 struct CAtom {
     predicate: CPredicate,
-    left: Term,
+    left: CTerm,
     right: CTerm,
 }
 
@@ -260,106 +278,12 @@ struct Clauses {
     clauses: Vec<Clause>,
 }
 
-impl Symbols {
-    fn format_cterm(&self, term: &CTerm) -> String {
-        match &term {
-            CTerm::Idy(t) => self.format_term(t),
-            CTerm::Add(l, r) => format!("+({}, {})", self.format_term(l), self.format_term(r)),
-            CTerm::Mul(l, r) => format!("*({}, {})", self.format_term(l), self.format_term(r)),
-            CTerm::Sub(l, r) => format!("-({}, {})", self.format_term(l), self.format_term(r)),
-            CTerm::Neg(t) => format!("-{}", self.format_term(t)),
-        }
-    }
-
-    fn format_catom(&self, atom: &CAtom) -> String {
-        format!(
-            "{} {} {}",
-            self.format_term(&atom.left),
-            atom.predicate,
-            self.format_cterm(&atom.right),
-        )
-    }
-
-    fn format_term(&self, t: &Term) -> String {
-        match (*t).try_into() {
-            Ok(c) => self.constants.interner.resolve(c).unwrap().to_owned(),
-            Err(_) => match (*t).try_into() {
-                Ok::<Variable, _>(v) => v.to_string(),
-                Err(_) => unreachable!(),
-            },
-        }
-    }
-
-    fn format(&self, atom: &Atom) -> String {
-        let terms = atom
-            .terms
-            .iter()
-            .map(|&t| self.format_term(&t))
-            .collect::<Vec<String>>()
-            .join(", ");
-        format!(
-            "{}({})",
-            self.predicates.interner.resolve(atom.predicate).unwrap(),
-            terms
-        )
-    }
-
-    fn format_clause(&self, clause: &Clause) -> String {
-        let (premises, conclusions) = clause.split_at_arrow();
-
-        let constraint_str = if clause.constraint.atoms.is_empty() {
-            String::from("")
-        } else {
-            clause
-                .constraint
-                .atoms
-                .iter()
-                .map(|atom| self.format_catom(atom))
-                .collect::<Vec<String>>()
-                .join(", ")
-                + " ∥ "
-        };
-
-        let premise_str = premises
-            .iter()
-            .map(|atom| self.format(atom))
-            .collect::<Vec<String>>()
-            .join(", ");
-
-        let conclusion_str = conclusions
-            .iter()
-            .map(|atom| self.format(atom))
-            .collect::<Vec<String>>()
-            .join(", ");
-
-        let sorts = clause
-            .typs
-            .iter()
-            .map(|t| t.to_string())
-            .collect::<Vec<String>>()
-            .join("");
-
-        format!(
-            "{}:{}:{}:{}:{}: {}{} → {}.",
-            clause.id,
-            clause.atoms.len(),
-            clause.typs.len(),
-            clause.parents,
-            sorts,
-            constraint_str,
-            premise_str,
-            conclusion_str
-        )
-    }
-}
-
 #[derive(Debug)]
 struct Constraint {
     atoms: Box<[CAtom]>,
     problem: minilp::Problem,
 }
 
-// TODO: Improve locality of a clause. We want it to have a contiguous layout in memory.
 #[derive(Debug)]
 struct Clause {
     id: usize,

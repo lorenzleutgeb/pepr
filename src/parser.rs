@@ -1,14 +1,15 @@
 use crate::Constraint;
 use crate::{
-    bail, debug_unreachable, symbols::Term, Atom, CAtom, CPredicate, CTerm, Clause, ConstantData,
-    Constants, Interner, Parents, PredicateData, Predicates, State, Symbols, Typ, VariableData,
-    Variables,
+    bail, debug_unreachable, fmt::DisplayWithSymbols, symbols::Term, Atom, CAtom, CPredicate,
+    CTerm, Clause, ConstantData, Constants, Interner, Parents, PredicateData, Predicates, State,
+    Symbols, Typ, VariableData, Variables,
 };
+use core::panic;
 use minilp::Problem;
 use pest::error::Error as PestError;
 use pest::{
     iterators::{Pair, Pairs},
-    Position, Span,
+    Parser, Position, Span,
 };
 use std::fmt::Debug;
 use string_interner::Symbol;
@@ -73,7 +74,7 @@ fn parse_preamble_item(symbols: &mut Symbols, pair: Pair<Rule>) {
         Rule::constant => {
             let s = pair_term.as_str();
             let constant = symbols.constants.interner.get_or_intern(s);
-            let index = constant.to_index();
+            let index = constant.to_usize();
             if index == symbols.constants.data.len() {
                 symbols.constants.data.push(ConstantData { typ })
             } else if symbols.constants.data[index].typ != typ {
@@ -90,7 +91,7 @@ fn parse_preamble_item(symbols: &mut Symbols, pair: Pair<Rule>) {
         Rule::variable => {
             let s = pair_term.as_str();
             let variable = symbols.variables.interner.get_or_intern(s);
-            let index = variable.to_index();
+            let index = variable.to_usize();
             if index == symbols.variables.data.len() {
                 symbols.variables.data.push(VariableData { typ })
             } else if symbols.variables.data[index].typ != typ {
@@ -109,6 +110,13 @@ fn parse_preamble_item(symbols: &mut Symbols, pair: Pair<Rule>) {
 }
 
 impl State {
+    pub fn parse_str(str: &str) -> Option<State> {
+        match FTCNFParser::parse(Rule::input, str) {
+            Ok(pairs) => Some(State::parse(pairs)),
+            Err(_) => None,
+        }
+    }
+
     pub fn parse(pairs: Pairs<Rule>) -> State {
         let mut state = State {
             symbols: Symbols {
@@ -180,7 +188,7 @@ impl Clause {
             typs: variables.data.iter().map(|d| d.typ).collect(),
         };
 
-        println!("{}", state.symbols.format_clause(&clause));
+        println!("{}", clause.display(&state.symbols));
 
         state.clauses.push(clause);
     }
@@ -206,11 +214,7 @@ impl CAtom {
 
         CAtom {
             predicate: CPredicate::parse(pairs.next().unwrap().as_rule()),
-            left: match CTerm::parse(symbols, clause_variables, pairs.next().unwrap()) {
-                CTerm::Idy(t) => t,
-                _ => todo!(),
-            },
-            // left: Term::parse(symbols, clause_variables, pairs.next().unwrap()),
+            left: CTerm::parse(symbols, clause_variables, pairs.next().unwrap()),
             right: CTerm::parse(symbols, clause_variables, pairs.next().unwrap()),
         }
     }
@@ -224,31 +228,42 @@ impl CTerm {
     ) -> CTerm {
         let mut op: Option<Rule> = None;
         let mut args = vec![];
+        let span = pair.as_span();
         for inner in pair.into_inner() {
             match inner.as_rule() {
                 Rule::add | Rule::mul | Rule::sub => {
                     op = Some(inner.as_rule());
                 }
-                Rule::cterm => match CTerm::parse(symbols, clause_variables, inner) {
-                    CTerm::Idy(t) => args.push(t),
-                    _ => todo!(),
-                },
+                Rule::cterm => args.push(CTerm::parse(symbols, clause_variables, inner)),
                 _ => debug_unreachable!(),
             }
         }
+        let boxed = args.into_boxed_slice();
 
         if op == Some(Rule::sub) {
-            if args.len() == 1 {
-                CTerm::Neg(args[0])
+            if boxed.len() == 1 {
+                CTerm::Neg(boxed.try_into().unwrap())
             } else {
-                CTerm::Sub(args[0], args[1])
+                CTerm::Sub(boxed.try_into().unwrap())
             }
-        } else if args.len() != 2 {
+        } else if boxed.len() != 2 {
             todo!()
         } else if op == Some(Rule::add) {
-            CTerm::Add(args[0], args[1])
+            CTerm::Add(boxed.try_into().unwrap())
         } else if op == Some(Rule::mul) {
-            CTerm::Mul(args[0], args[1])
+            if let CTerm::Inj(term) = boxed[1] {
+                match term {
+                    Term::Constant(_, _) => return CTerm::Mul(boxed.try_into().unwrap()),
+                    _ => {
+                        bail_from_span(String::from("Non-Linear!"), 1, span);
+                        panic!()
+                    }
+                }
+            } else {
+                // In this case, the right argument might actually evaluate to a
+                // constant, e.g. *(x,+(1,1)). Flattening is not implemented.
+                todo!()
+            }
         } else {
             debug_unreachable!()
         }
@@ -257,12 +272,12 @@ impl CTerm {
     fn parse(symbols: &mut Symbols, clause_variables: &mut Variables, pair: Pair<Rule>) -> CTerm {
         for inner in pair.into_inner() {
             match inner.as_rule() {
-                Rule::term => return CTerm::Idy(Term::parse(symbols, clause_variables, inner)),
+                Rule::term => return CTerm::Inj(Term::parse(symbols, clause_variables, inner)),
                 Rule::op => return CTerm::parse_op(symbols, clause_variables, inner),
                 _ => debug_unreachable!(),
             }
         }
-        unreachable!()
+        debug_unreachable!()
     }
 }
 
@@ -341,34 +356,34 @@ impl Atom {
 
 impl Term {
     fn parse(symbols: &mut Symbols, clause_variables: &mut Variables, pair: Pair<Rule>) -> Term {
-        let _span = pair.as_span();
         for inner in pair.into_inner() {
-            let _innerspan = inner.as_span();
             match inner.as_rule() {
-                Rule::constant | Rule::natural0 => {
-                    return symbols
-                        .constants
-                        .interner
-                        .get_or_intern(inner.as_str())
-                        .into();
+                Rule::natural0 => return Term::Integer(inner.as_str().parse().unwrap()),
+                Rule::constant => {
+                    // TODO: Fix type.
+                    return Term::Constant(
+                        symbols
+                            .constants
+                            .interner
+                            .get_or_intern(inner.as_str())
+                            .get(),
+                        Typ::R,
+                    );
                 }
                 Rule::variable => {
                     // First check variables from preamble, then fall back to clause variables.
                     let s = inner.as_str();
                     let t = match symbols.variables.interner.get(s) {
-                        Some(v) => symbols.variables.data[v.to_index()].typ,
+                        Some(v) => symbols.variables.data[v.to_usize()].typ,
                         None => Typ::R,
                     };
                     let v = clause_variables.interner.get_or_intern(inner.as_str());
-                    if v.to_index() == clause_variables.data.len() {
+                    if v.to_usize() == clause_variables.data.len() {
                         clause_variables.data.push(VariableData { typ: t })
                     }
-                    return v.into();
+                    return Term::Variable(v.get(), t);
                 }
-                _ => {
-                    println!("{:?}", inner);
-                    debug_unreachable!();
-                }
+                _ => debug_unreachable!(),
             }
         }
         debug_unreachable!();

@@ -1,0 +1,29 @@
+=(z,+(x,1)) || Sl1Sl2(x,y) -> Sl1W2(x,z), W1Cr2(z,x).
+=(x,0) ||  Sl1W2(x,y) -> Sl1Cr2(x,y), W1W2(x,y).
+<(y,x) ||  Sl1W2(x,y) -> Sl1Cr2(x,y).
+=(z,+(y,1)) || Sl1W2(x,y) -> W1W2(z,y).
+=(x,0) ||  W1W2(x,y) -> W1Cr2(x,y).
+<(y,x) ||  W1W2(x,y) -> W1Cr2(x,y).
+=(z,+(y,1)) || SlCr2(x,y) -> W1Cr2(z,y).
+Sl1Cr2(x,y) -> Sl1Sl2(x,0).
+=(x,0) ||  W1Cr2(x,y), W1W2(x,y) -> C1Cr2(x,y).
+<(x,y) ||  W1Cr2(x,y), W1W2(y,x) -> C1Cr2(x,y).
+W1Cr2(x,y) -> W1Sl2(x,0).
+Cr1Cr2(x,y) -> Sl1Cr2(0,y).
+
+=(z,+(y,1)) || Sl1Sl2(x,y) -> W1Sl2(z,y).
+=(x,0) ||  W1Sl2(x,y) -> Cr1Sl2(x,y).
+<(x,y) ||  W1Sl2(x,y) -> Cr1Sl2(x,y).
+=(z,+(x,1)) || W1Sl2(x,y) -> W1W2(x,z).
+=(x,0) ||  W1W2(x,y) -> Cr1W2(x,y).
+<(x,y) ||  W1W2(x,y) -> Cr1W2(x,y).
+=(z,+(x,1)) || Cr1Sl2(x,y) -> Cr1W2(x,z).
+Cr1Sl2(x,y) -> Sl1Sl2(0,y), Cr1Sl2(x,0).
+=(x,0) ||  Cr1W2(x,y) -> Cr1Cr2(x,y).
+<(y,x) ||  Cr1W2(x,y) -> Cr1Cr2(x,y).
+Cr1W2(x,y) -> Sl1W2(0,y).
+Cr1Cr2(x,y) -> Cr1Sl2(x,0).
+
+>(x,0), >(y,0) || -> Sl1Sl2(x,y).
+
+>(x,0), <(x, 0) || -> Impossible(x).

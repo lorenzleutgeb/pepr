@@ -34,7 +34,11 @@
             }) [ "cargo" "rustc" ])))
         ];
         pkgs = import nixpkgs { inherit system overlays; };
-        buildInputs = [ pkgs.hyperfine pkgs.nodejs pkgs.time pkgs.cargo ];
+        buildInputs = with pkgs; [
+          cargo
+          cargo-tarpaulin
+          cargo-watch
+        ];
         nativeBuildInputs = [ ];
         inherit (import "${crate2nix}/tools.nix" { inherit pkgs; })
           generatedCargoNix;
