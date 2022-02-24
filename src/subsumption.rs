@@ -54,7 +54,7 @@ mod tests {
         let subsumes = Clause::dummy(
             vec![Atom {
                 predicate: 0,
-                terms: vec![x0.into()].into_boxed_slice(),
+                terms: vec![x0].into_boxed_slice(),
             }],
             vec![],
         );
@@ -80,7 +80,7 @@ mod tests {
         let subsumed = Clause::dummy(
             vec![Atom {
                 predicate: 0,
-                terms: vec![x0.into()].into_boxed_slice(),
+                terms: vec![x0].into_boxed_slice(),
             }],
             vec![],
         );
@@ -122,39 +122,15 @@ mod tests {
             vec![
                 Atom {
                     predicate: r,
-                    terms: vec![
-                        x.into(),
-                        c_true.into(),
-                        y.into(),
-                        c_true.into(),
-                        z.into(),
-                        c_false.into(),
-                    ]
-                    .into_boxed_slice(),
+                    terms: vec![x, c_true, y, c_true, z, c_false].into_boxed_slice(),
                 },
                 Atom {
                     predicate: r,
-                    terms: vec![
-                        x.into(),
-                        c_false.into(),
-                        y.into(),
-                        c_false.into(),
-                        z.into(),
-                        c_true.into(),
-                    ]
-                    .into_boxed_slice(),
+                    terms: vec![x, c_false, y, c_false, z, c_true].into_boxed_slice(),
                 },
                 Atom {
                     predicate: r,
-                    terms: vec![
-                        x.into(),
-                        c_false.into(),
-                        y.into(),
-                        c_true.into(),
-                        z.into(),
-                        c_false.into(),
-                    ]
-                    .into_boxed_slice(),
+                    terms: vec![x, c_false, y, c_true, z, c_false].into_boxed_slice(),
                 },
             ],
         );
@@ -164,27 +140,11 @@ mod tests {
             vec![
                 Atom {
                     predicate: r,
-                    terms: vec![
-                        x.into(),
-                        c_true.into(),
-                        x.into(),
-                        c_true.into(),
-                        x.into(),
-                        c_true.into(),
-                    ]
-                    .into_boxed_slice(),
+                    terms: vec![x, c_true, x, c_true, x, c_true].into_boxed_slice(),
                 },
                 Atom {
                     predicate: r,
-                    terms: vec![
-                        x.into(),
-                        c_false.into(),
-                        x.into(),
-                        c_false.into(),
-                        x.into(),
-                        c_false.into(),
-                    ]
-                    .into_boxed_slice(),
+                    terms: vec![x, c_false, x, c_false, x, c_false].into_boxed_slice(),
                 },
             ],
         );
@@ -205,12 +165,12 @@ mod tests {
                 .map(|assignment| Atom {
                     predicate: r,
                     terms: vec![
-                        assignment.0 .0.into(),
-                        assignment.0 .1.into(),
-                        assignment.1 .0.into(),
-                        assignment.1 .1.into(),
-                        assignment.2 .0.into(),
-                        assignment.2 .1.into(),
+                        assignment.0 .0,
+                        assignment.0 .1,
+                        assignment.1 .0,
+                        assignment.1 .1,
+                        assignment.2 .0,
+                        assignment.2 .1,
                     ]
                     .into_boxed_slice(),
                 })

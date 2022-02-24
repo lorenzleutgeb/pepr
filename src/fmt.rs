@@ -1,7 +1,5 @@
 //! Formatting all kinds of things.
 
-use std::fmt::Debug;
-
 use string_interner::backend::Backend;
 
 use crate::{symbols::*, *};
@@ -10,7 +8,7 @@ pub trait DisplayWithSymbols: Sized {
     fn display<'a>(&'a self, symbols: &'a Symbols) -> DisplayWrapper<'a, Self> {
         DisplayWrapper {
             wrapped: self,
-            symbols: symbols,
+            symbols,
         }
     }
     fn fmt_internal(&self, symbols: &Symbols, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result;
@@ -30,8 +28,8 @@ impl<'a, T: DisplayWithSymbols> std::fmt::Display for DisplayWrapper<'a, T> {
 impl DisplayWithSymbols for Term {
     fn fmt_internal(&self, symbols: &Symbols, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match *self {
-            Term::Variable(v, t) => write!(f, "_{}", v),
-            Term::Constant(c, t) => write!(
+            Term::Variable(v, _t) => write!(f, "_{}", v),
+            Term::Constant(c, _t) => write!(
                 f,
                 "{}",
                 symbols.constants.interner.resolve(c.into()).unwrap()

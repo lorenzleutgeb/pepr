@@ -1,22 +1,26 @@
-use std::convert::TryInto;
+use std::default::Default;
 
-use crate::{symbols::Term, Atom};
+use crate::{
+    symbols::{Term, Variable},
+    Atom,
+};
 
 const MAX_VARS: usize = 256;
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Default, Debug, Eq, PartialEq)]
 struct Mapping {
     term: Option<Term>,
     generation: usize,
 }
 
+#[derive(Clone, Copy, Default, Debug)]
 struct History {
-    variable: u32,
+    variable: Variable,
     previous: Option<Term>,
 }
 
 impl History {
-    fn identity(variable: u32) -> History {
+    fn identity(variable: Variable) -> History {
         History {
             variable,
             previous: None,
@@ -32,18 +36,22 @@ pub struct Substitution {
     active: bool,
 }
 
+impl Default for Substitution {
+    fn default() -> Self {
+        Self {
+            mapping: [Default::default(); MAX_VARS],
+            generation: Default::default(),
+            history: Default::default(),
+
+            #[cfg(debug_assertions)]
+            active: Default::default(),
+        }
+    }
+}
+
 impl Substitution {
     pub fn new() -> Substitution {
-        Substitution {
-            generation: 0,
-            mapping: [Mapping {
-                term: None,
-                generation: 0,
-            }; MAX_VARS],
-            history: Vec::with_capacity(MAX_VARS),
-            #[cfg(debug_assertions)]
-            active: false,
-        }
+        Default::default()
     }
 
     pub fn start(&mut self) {
@@ -52,7 +60,12 @@ impl Substitution {
             assert!(!self.active);
             self.active = true;
         }
-        self.generation = self.generation.wrapping_add(1);
+        self.generation = if self.generation == usize::MAX {
+            self.mapping = [Default::default(); MAX_VARS];
+            0
+        } else {
+            self.generation + 1
+        }
     }
 
     pub fn stop(&mut self) {
@@ -64,17 +77,15 @@ impl Substitution {
         self.history.clear();
     }
 
-    fn get(&self, variable: u32) -> Option<Term> {
+    fn get(&self, variable: Variable) -> Option<Term> {
         #[cfg(debug_assertions)]
         {
             assert!(self.active);
         }
 
-        let i = variable as usize;
-
-        assert!(i <= MAX_VARS);
-
-        let x = &self.mapping[i];
+        let index = variable as usize;
+        assert!(index <= MAX_VARS);
+        let x = &self.mapping[index];
 
         if x.generation == self.generation {
             x.term
@@ -83,7 +94,7 @@ impl Substitution {
         }
     }
 
-    fn set(&mut self, variable: u32, term: Term) {
+    fn set(&mut self, variable: Variable, term: Term) {
         #[cfg(debug_assertions)]
         {
             assert!(self.active);
@@ -92,20 +103,19 @@ impl Substitution {
             }
         }
 
-        let i = variable as usize;
+        let index = variable as usize;
+        assert!(index <= MAX_VARS);
 
-        assert!(i <= MAX_VARS);
-
-        if self.mapping[i].generation == self.generation {
+        if self.mapping[index].generation == self.generation {
             self.history.push(History {
                 variable,
-                previous: self.mapping[i].term,
+                previous: self.mapping[index].term,
             });
         } else {
             self.history.push(History::identity(variable))
         }
 
-        self.mapping[i] = Mapping {
+        self.mapping[index] = Mapping {
             term: Some(term),
             generation: self.generation,
         }
@@ -172,9 +182,7 @@ impl Substitution {
 impl Drop for Substitution {
     fn drop(&mut self) {
         #[cfg(debug_assertions)]
-        {
-            debug_assert!(std::thread::panicking() || !self.active)
-        }
+        debug_assert!(std::thread::panicking() || !self.active)
     }
 }
 
@@ -223,13 +231,13 @@ mod tests {
         };
         let r: Atom = Atom {
             predicate: 1,
-            terms: vec![a.into()].into_boxed_slice(),
+            terms: vec![a].into_boxed_slice(),
         };
 
         let s = &mut Substitution::new();
         s.start();
         assert!(s.match_atoms(&l, &r));
-        assert_eq!(s.get(x), Some(a.into()));
+        assert_eq!(s.get(x), Some(a));
         s.stop();
     }
 
@@ -241,7 +249,7 @@ mod tests {
 
         let l: Atom = Atom {
             predicate: 1,
-            terms: vec![a.into()].into_boxed_slice(),
+            terms: vec![a].into_boxed_slice(),
         };
         let r: Atom = Atom {
             predicate: 1,
@@ -251,7 +259,40 @@ mod tests {
         let s = &mut Substitution::new();
         s.start();
         assert!(s.match_atoms(&l, &r));
-        assert_eq!(s.get(x), Some(a.into()));
+        assert_eq!(s.get(x), Some(a));
+        s.stop();
+    }
+
+    #[test]
+    fn checked_add() {
+        let x: u8 = 254;
+        assert!(x.checked_add(1).is_some());
+        assert_eq!(x, 254);
+    }
+
+    #[test]
+    fn start_overflow() {
+        let generation = usize::MAX;
+        let mut s = Substitution {
+            generation,
+            mapping: [Mapping {
+                generation,
+                term: None,
+            }; MAX_VARS],
+            history: vec![],
+            active: false,
+        };
+        for i in 0..MAX_VARS {
+            s.mapping[i] = Mapping {
+                generation,
+                term: Some(Term::Constant(i as u32, Typ::R)),
+            }
+        }
+        s.start();
+        for i in 0..MAX_VARS {
+            assert_eq!(s.get(i as u32), None);
+            assert_eq!(s.mapping[i], Default::default());
+        }
         s.stop();
     }
 }

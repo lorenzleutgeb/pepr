@@ -2,17 +2,14 @@
 
 use crate::fmt::DisplayWithSymbols;
 use crate::{symbols::*, *};
-use clap::Parser as ClapParser;
-use good_lp::solvers::minilp::MiniLpSolution;
+
 use good_lp::Variable as LPVariable;
-use good_lp::{Expression, IntoAffineExpression, ProblemVariables, VariableDefinition};
+use good_lp::{Expression, ProblemVariables, VariableDefinition};
 use good_lp::{ResolutionError, Solution, SolverModel};
-use std::env::var;
-use std::fs;
-use std::intrinsics::transmute;
-use std::ops::{AddAssign, Mul};
-use std::str::FromStr;
-use std::{convert::TryInto, ops::Deref};
+
+use std::ops::Mul;
+
+use std::ops::Deref;
 
 const EPISLON: f64 = 1. / 1000.;
 
@@ -80,7 +77,7 @@ impl Clause {
             // TODO: We assume that all variables are relevant for the constraint.
             let next = variables.add(VariableDefinition::new().name(format!("_{}", i)));
             vars.push(next);
-            sum = sum + &next;
+            sum += &next;
         }
 
         debug_assert!(vars.len() == self.typs.len());

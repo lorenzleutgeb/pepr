@@ -8,30 +8,30 @@ mod fmt;
 mod la;
 mod macros;
 mod parser;
+mod resolution;
 mod substitution;
 mod subsumption;
 mod symbols;
+mod unification;
 
 use crate::fmt::DisplayWithSymbols;
-use crate::symbols::{Constant, Integer, Term, Variable};
+use crate::symbols::Term;
 use clap::Parser as ClapParser;
-use clap_verbosity_flag::Verbosity;
+
 use cli::Cli;
-use core::mem::size_of;
-use good_lp::{Expression, IntoAffineExpression, ProblemVariables, VariableDefinition};
-use log::{debug, error, info, trace, warn};
+
+use log::warn;
 use parser::{FTCNFParser, Rule};
 use pest::Parser as PestParser;
 use std::fmt::Display;
 use std::fs;
 use std::iter::IntoIterator;
-use std::ops::Mul;
+
 use std::process;
-use std::str::FromStr;
-use std::{convert::TryInto, ops::Deref};
+
 use string_interner::backend::BucketBackend;
 use string_interner::StringInterner;
-use symbols::SymbolU32;
+use symbols::{Predicate, SymbolU32};
 
 type Interner<T> = StringInterner<BucketBackend<T>>;
 
@@ -44,15 +44,13 @@ pub enum Typ {
 
 impl Typ {
     /// Decides subtyping relation.
+    /// Types are subtypes of themselves for convenience.
     fn contains(self, other: Typ) -> bool {
-        match (self, other) {
-            (Typ::R, Typ::I) => true,
-            _ => false,
-        }
+        self == other || (self == Typ::R && other == Typ::I)
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq)]
 struct ClausePosition {
     clause: usize,
     literal: usize,
@@ -64,7 +62,7 @@ impl Display for ClausePosition {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq)]
 enum Parents {
     Input,
     Resolvent(ClausePosition, ClausePosition),
@@ -171,12 +169,12 @@ struct PredicateData {
 }
 
 struct Predicates {
-    interner: Interner<usize>,
+    interner: Interner<Predicate>,
     data: Vec<PredicateData>,
 }
 
 impl Predicates {
-    fn arity(&self, predicate: usize) -> usize {
+    fn arity(&self, predicate: Predicate) -> usize {
         self.data[predicate].arity
     }
 }
@@ -205,7 +203,7 @@ struct Variables {
     data: Vec<VariableData>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 enum CPredicate {
     Eq,
     Ne,
@@ -228,7 +226,7 @@ impl Display for CPredicate {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 enum CTerm {
     /// Injection of [Term].
     Inj(Term),
@@ -246,22 +244,50 @@ enum CTerm {
     Mul(Box<[CTerm; 2]>),
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 struct CAtom {
     predicate: CPredicate,
     left: CTerm,
     right: CTerm,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 struct Atom {
-    predicate: usize,
+    predicate: Predicate,
     terms: Box<[Term]>,
 }
 
 impl Atom {
+    fn new(predicate: Predicate, terms: Vec<Term>) -> Atom {
+        Atom {
+            predicate,
+            terms: terms.into_boxed_slice(),
+        }
+    }
+
+    fn propositional(predicate: Predicate) -> Atom {
+        Atom {
+            predicate,
+            terms: Vec::with_capacity(0).into_boxed_slice(),
+        }
+    }
+
     fn len(&self) -> usize {
         self.terms.len()
+    }
+}
+
+#[cfg(test)]
+impl From<Vec<Term>> for Atom {
+    fn from(terms: Vec<Term>) -> Self {
+        Atom::new(0, terms)
+    }
+}
+
+#[cfg(test)]
+impl From<Predicate> for Atom {
+    fn from(predicate: Predicate) -> Self {
+        Atom::propositional(predicate)
     }
 }
 
@@ -278,13 +304,12 @@ struct Clauses {
     clauses: Vec<Clause>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq)]
 struct Constraint {
     atoms: Box<[CAtom]>,
-    problem: minilp::Problem,
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq)]
 struct Clause {
     id: usize,
     constraint: Constraint,
@@ -311,7 +336,6 @@ impl Clause {
             id: 0,
             constraint: Constraint {
                 atoms: vec![].into_boxed_slice(),
-                problem: minilp::Problem::new(minilp::OptimizationDirection::Minimize),
             },
             atoms,
             arrow,

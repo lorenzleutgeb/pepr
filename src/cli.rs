@@ -1,8 +1,8 @@
-use clap::{AppSettings, Parser, Subcommand};
+use clap::Parser;
 use clap_verbosity_flag::Verbosity;
-use std::fmt::Write;
+
+use std::mem::size_of;
 use std::path::PathBuf;
-use std::{fmt::format, mem::size_of};
 
 use crate::symbols::{Constant, Integer, Term, Variable};
 

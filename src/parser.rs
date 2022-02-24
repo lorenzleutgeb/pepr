@@ -5,7 +5,7 @@ use crate::{
     Symbols, Typ, VariableData, Variables,
 };
 use core::panic;
-use minilp::Problem;
+
 use pest::error::Error as PestError;
 use pest::{
     iterators::{Pair, Pairs},
@@ -17,10 +17,6 @@ use string_interner::Symbol;
 #[derive(pest_derive::Parser)]
 #[grammar = "grammar.pest"]
 pub struct FTCNFParser;
-
-fn parse_constraint(_symbols: &mut Symbols, _pair: Pair<Rule>) {
-    let _problem = Problem::new(minilp::OptimizationDirection::Minimize);
-}
 
 /*
 fn parse_catom(symbols: &mut Symbols, pair: Pair<Rule>) {
@@ -180,7 +176,6 @@ impl Clause {
             id: state.clauses.len(),
             constraint: Constraint {
                 atoms: catoms.into_boxed_slice(),
-                problem: minilp::Problem::new(minilp::OptimizationDirection::Minimize),
             },
             atoms: atoms.into_boxed_slice(),
             arrow,
@@ -253,7 +248,7 @@ impl CTerm {
         } else if op == Some(Rule::mul) {
             if let CTerm::Inj(term) = boxed[1] {
                 match term {
-                    Term::Constant(_, _) => return CTerm::Mul(boxed.try_into().unwrap()),
+                    Term::Constant(_, _) => CTerm::Mul(boxed.try_into().unwrap()),
                     _ => {
                         bail_from_span(String::from("Non-Linear!"), 1, span);
                         panic!()

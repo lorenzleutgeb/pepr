@@ -1,13 +1,7 @@
 #[cfg(test)]
 mod tests {
-    use std::mem::size_of;
 
-    use super::*;
-
-    use crate::{
-        parser::{FTCNFParser, Rule},
-        State,
-    };
+    use crate::State;
 
     #[test]
     fn bakery() {

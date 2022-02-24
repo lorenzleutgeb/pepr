@@ -1,20 +1,13 @@
-use std::{
-    convert::TryInto,
-    num::{NonZeroU32, NonZeroUsize},
-};
+use std::num::NonZeroU32;
 
 use string_interner::Symbol;
 
 use crate::Typ;
 
 pub type Variable = u32;
-
 pub type Constant = u32;
-
 pub type Integer = i32;
-
-const TERM_MASK_BITS: usize = 1;
-const TERM_MASK: usize = 0b1;
+pub type Predicate = usize;
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum Term {
@@ -193,7 +186,6 @@ impl string_interner::Symbol for Constant {
 }
 
 */
-struct Predicate(NonZeroUsize);
 
 #[cfg(test)]
 mod tests {
