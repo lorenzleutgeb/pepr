@@ -13,6 +13,8 @@ fn resolve(clause: [&Clause; 2], index: [usize; 2]) -> Clause {
         }
     }
 
+    let arrow = clause[0].arrow + clause[1].arrow - 1;
+
     let mut atoms = Vec::with_capacity(clause[0].atoms.len() + clause[1].atoms.len() - 2);
 
     let splits = clause.map(|c| c.split_at_arrow());
@@ -24,9 +26,6 @@ fn resolve(clause: [&Clause; 2], index: [usize; 2]) -> Clause {
             }
         }
     }
-
-    let arrow = atoms.len();
-
     for i in 0..2 {
         for (j, atom) in splits[i].1.iter().enumerate() {
             if j + clause[i].arrow != index[i] {
