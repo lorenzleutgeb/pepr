@@ -4,7 +4,7 @@ use string_interner::backend::Backend;
 
 use crate::{symbols::*, *};
 
-pub trait DisplayWithSymbols: Sized {
+pub(crate) trait DisplayWithSymbols: Sized {
     fn display<'a>(&'a self, symbols: &'a Symbols) -> DisplayWrapper<'a, Self> {
         DisplayWrapper {
             wrapped: self,
@@ -14,7 +14,7 @@ pub trait DisplayWithSymbols: Sized {
     fn fmt_internal(&self, symbols: &Symbols, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result;
 }
 
-pub struct DisplayWrapper<'a, T> {
+pub(crate) struct DisplayWrapper<'a, T> {
     wrapped: &'a T,
     symbols: &'a Symbols,
 }
@@ -28,14 +28,17 @@ impl<'a, T: DisplayWithSymbols> std::fmt::Display for DisplayWrapper<'a, T> {
 impl DisplayWithSymbols for Term {
     fn fmt_internal(&self, symbols: &Symbols, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match *self {
-            Term::Variable(v, _t) => write!(f, "_{}", v),
-            Term::Constant(c, _t) => write!(
+            Term::Variable(_, _) => self.fmt(f),
+            Term::Constant(c, _) => write!(
                 f,
                 "{}",
-                symbols.constants.interner.resolve(c.into()).unwrap()
+                symbols
+                    .constants
+                    .interner
+                    .resolve(SymbolU32::try_from(c).unwrap())
+                    .unwrap()
             ),
             Term::Integer(i) => write!(f, "{}", i),
-            _ => debug_unreachable!(),
         }
     }
 }

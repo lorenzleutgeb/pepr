@@ -1,0 +1,178 @@
+p(xa:F),
+p(amovestraight:F),
+p(achangeleft:F),
+p(achangeright:F),
+p(adeceleratestraight:F),
+p(adecelerateleft:F),
+p(adecelerateright:F),
+p(aacceleratestraight:F),
+p(aaccelerateleft:F),
+p(aaccelerateright:F)
+
+
+VariantName(xv), LaneNotSafe(xv, xl, xa)                        -> ExcludedAction(xv, xa).
+VariantName(xv), SelfSuggestionDisproven(xv, xa)                 -> ExcludedAction(xv, xa).
+NotAVariantName(xv), ActionName(xa)                              -> ExcludedAction(xv,xa).
+CertifiedVariant(xv1), UpdatedVariant(xv2), LaneNotSafe(xv1, xl, xa) -> ExcludedAction(xv2,xa).
+
+
+ShouldNotUseLane(xv, xenl, xa), LaneSafe(xv, xl, xa), SuggestedAction(xv, xa), VariantName(xv) -> SelfSuggestionDisproven(xv, xa).
+
+CaseShouldNotUseLane1(xv, xenl, xa) -> ShouldNotUseLane(xv, xenl, xa).
+CaseShouldNotUseLane2(xv, xenl, xa) -> ShouldNotUseLane(xv, xenl, xa).
+CaseShouldNotUseLane3(xv, xenl, xa) -> ShouldNotUseLane(xv, xenl, xa).
+
+SafeActionDoesNotMatchChangeToLane(xv, xenl, xecl, xecs, xes, xa) -> CaseShouldNotUseLane1(xv, xenl, xa).
+SafeDistanceSpeedFrontDisproven(xv, xenl, xecl, xecs, xes, xa) -> CaseShouldNotUseLane2(xv, xenl, xa).
+SafeDistanceSpeedBehindDisproven(xv, xenl, xecl, xecs, xes, xa) -> CaseShouldNotUseLane3(xv, xenl, xa).
+
+CaseSafeActionDoesNotMatchChangeToLane(xv, xenl, xecl, xecs, xes, xa)                        -> SafeActionDoesNotMatchChangeToLane(xv, xenl, xecl, xecs, xes, xa).
+!=(xenl, xecl)       || LaneSafe(xv, xenl, amovestraight), EgoCar(xv, xecl, xecs, xes)       -> CaseSafeActionDoesNotMatchChangeToLane(xv, xenl, xecl, xecs, xes, amovestraight).
+!=(xenl, xecl)       || LaneSafe(xv, xenl, adeceleratestraight), EgoCar(xv, xecl, xecs, xes) -> CaseSafeActionDoesNotMatchChangeToLane(xv, xenl, xecl, xecs, xes, adeceleratestraight).
+!=(xenl, xecl)       || LaneSafe(xv, xenl, aacceleratestraight), EgoCar(xv, xecl, xecs, xes) -> CaseSafeActionDoesNotMatchChangeToLane(xv, xenl, xecl, xecs, xes, aacceleratestraight).
+NotIncByOne(xenl, xecl), LaneSafe(xv, xenl, achangeleft), EgoCar(xv, xecl, xecs, xes)         -> CaseSafeActionDoesNotMatchChangeToLane(xv, xenl, xecl, xecs, xes, achangeleft).
+NotIncByOne(xenl, xecl), LaneSafe(xv, xenl, adecelerateleft), EgoCar(xv, xecl, xecs, xes)     -> CaseSafeActionDoesNotMatchChangeToLane(xv, xenl, xecl, xecs, xes, adecelerateleft).
+NotIncByOne(xenl, xecl), LaneSafe(xv, xenl, aaccelerateleft), EgoCar(xv, xecl, xecs, xes)     -> CaseSafeActionDoesNotMatchChangeToLane(xv, xenl, xecl, xecs, xes, aaccelerateleft).
+NotDecByOne(xenl, xecl), LaneSafe(xv, xenl, achangeright), EgoCar(xv, xecl, xecs, xes)         -> CaseSafeActionDoesNotMatchChangeToLane(xv, xenl, xecl, xecs, xes, achangeright).
+NotDecByOne(xenl, xecl), LaneSafe(xv, xenl, adecelerateright), EgoCar(xv, xecl, xecs, xes)    -> CaseSafeActionDoesNotMatchChangeToLane(xv, xenl, xecl, xecs, xes, adecelerateright).
+NotDecByOne(xenl, xecl), LaneSafe(xv, xenl, aaccelerateright), EgoCar(xv, xecl, xecs, xes)    -> CaseSafeActionDoesNotMatchChangeToLane(xv, xenl, xecl, xecs, xes, aaccelerateright).
+
+SafeFrontDisproven(xv, xenl, xecl, xecs, xes, xa) -> SafeDistanceSpeedFrontDisproven(xv, xenl, xecl, xecs, xes, xa).
+!=(xecl, xenl)  || FrontDeceleratedSpeedLargerThanDistance(xes, xfd), LaneSafe(xv, xenl, adecelerateleft), EgoCar(xv, xecl, xecs, xes), DistanceFront(xv, xenl, xofp, xfd, adecelerateleft), SpeedFront(xv, xenl, xofp, xofs, adecelerateleft) -> SafeFrontDisproven(xv, xenl, xecl, xecs, xes, adecelerateleft).
+!=(xecl, xenl)  || FrontDeceleratedSpeedLargerThanDistance(xes, xfd), LaneSafe(xv, xenl, adecelerateright), EgoCar(xv, xecl, xecs, xes), DistanceFront(xv, xenl, xofp, xfd, adecelerateright), SpeedFront(xv, xenl, xofp, xofs, adecelerateright) -> SafeFrontDisproven(xv, xenl, xecl, xecs, xes, adecelerateright).
+!=(xecl, xenl) || FrontAcceleratedSpeedLargerThanDistance(xes, xfd), LaneSafe(xv, xenl, aaccelerateleft), EgoCar(xv, xecl, xecs, xes), DistanceFront(xv, xenl, xofp, xfd, aaccelerateleft), SpeedFront(xv, xenl, xofp, xofs, aaccelerateleft) -> SafeFrontDisproven(xv, xenl, xecl, xecs, xes, aaccelerateleft).
+!=(xecl, xenl)  || FrontAcceleratedSpeedLargerThanDistance(xes, xfd), LaneSafe(xv, xenl, aaccelerateright), EgoCar(xv, xecl, xecs, xes), DistanceFront(xv, xenl, xofp, xfd, aaccelerateright), SpeedFront(xv, xenl, xofp, xofs, aaccelerateright) -> SafeFrontDisproven(xv, xenl, xecl, xecs, xes, aaccelerateright).
+>(xes, xfd), !=(xecl, xenl)        || LaneSafe(xv, xenl, achangeleft), EgoCar(xv, xecl, xecs, xes), DistanceFront(xv, xenl, xofp, xfd, achangeleft), SpeedFront(xv, xenl, xofp, xofs, achangeleft) -> SafeFrontDisproven(xv, xenl, xecl, xecs, xes, achangeleft).
+>(xes, xfd), !=(xecl, xenl)        || LaneSafe(xv, xenl, achangeright), EgoCar(xv, xecl, xecs, xes), DistanceFront(xv, xenl, xofp, xfd, achangeright), SpeedFront(xv, xenl, xofp, xofs, achangeright) -> SafeFrontDisproven(xv, xenl, xecl, xecs, xes, achangeright).
+=(xecl, xenl) || FrontAcceleratedSpeedLargerThanDistance(xes, xfd), FrontAcceleratedSpeedLargerThanOtherSpeed(xes, xofs), LaneSafe(xv, xenl, aacceleratestraight), EgoCar(xv, xecl, xecs, xes), DistanceFront(xv, xenl, xofp, xfd, aacceleratestraight), SpeedFront(xv, xenl, xofp, xofs, aacceleratestraight) -> SafeFrontDisproven(xv, xenl, xecl, xecs, xes, aacceleratestraight).
+=(xecl, xenl) || FrontDeceleratedSpeedLargerThanDistance(xes, xfd), FrontDeceleratedSpeedLargerThanOtherSpeed(xes, xofs), LaneSafe(xv, xenl, adeceleratestraight), EgoCar(xv, xecl, xecs, xes), DistanceFront(xv, xenl, xofp, xfd, adeceleratestraight), SpeedFront(xv, xenl, xofp, xofs, adeceleratestraight) -> SafeFrontDisproven(xv, xenl, xecl, xecs, xes, adeceleratestraight).
+<(xofs, xes), >(xes, xfd), =(xecl, xenl)   || LaneSafe(xv, xenl, amovestraight), EgoCar(xv, xecl, xecs, xes), DistanceFront(xv, xenl, xofp, xfd, amovestraight), SpeedFront(xv, xenl, xofp, xofs, amovestraight) -> SafeFrontDisproven(xv, xenl, xecl, xecs, xes, amovestraight).
+
+
+SafeBehindDisproven(xv, xenl, xecl, xecs, xes, xa) -> SafeDistanceSpeedBehindDisproven(xv, xenl, xecl, xecs, xes, xa).
+>(xobs, xbd), !=(xecl, xenl)              || LaneSafe(xv, xenl, xa), EgoCar(xv, xecl, xecs, xes), DistanceBehind(xv, xenl, xobp, xbd, xa), SpeedBehind(xv, xenl, xobp, xobs, xa) -> SafeBehindDisproven(xv, xenl, xecl, xecs, xes, xa).
+>(xobs, xbd), =(xecl, xenl)               || BehindAcceleratedSpeedLessThanOtherSpeed(xes, xobs), LaneSafe(xv, xenl, aacceleratestraight), EgoCar(xv, xecl, xecs, xes), DistanceBehind(xv, xenl, xobp, xbd, aacceleratestraight), SpeedBehind(xv, xenl, xobp, xobs, aacceleratestraight) -> SafeBehindDisproven(xv, xenl, xecl, xecs, xes, aacceleratestraight).
+>(xobs, xbd), =(xecl, xenl)               || BehindDeceleratedSpeedLessThanOtherSpeed(xes, xobs), LaneSafe(xv, xenl, adeceleratestraight), EgoCar(xv, xecl, xecs, xes), DistanceBehind(xv, xenl, xobp, xbd, adeceleratestraight), SpeedBehind(xv, xenl, xobp, xobs, adeceleratestraight) -> SafeBehindDisproven(xv, xenl, xecl, xecs, xes, adeceleratestraight).
+>(xobs, xes), >(xobs, xbd), =(xecl, xenl) || LaneSafe(xv, xenl, amovestraight), EgoCar(xv, xecl, xecs, xes), DistanceBehind(xv, xenl, xobp, xbd, amovestraight), SpeedBehind(xv, xenl, xobp, xobs, amovestraight) -> SafeBehindDisproven(xv, xenl, xecl, xecs, xes, amovestraight).
+
+
+
+
+
+-> DistanceBehind(0, 2, 4, 0, aaccelerateleft).
+-> SpeedBehind(0, 2, 4, 5, aaccelerateleft).
+-> LaneNotSafe(0, 2, aaccelerateleft).
+-> DistanceFront(0, 0, 5, 0, achangeright).
+-> SpeedFront(0, 0, 5, 1, achangeright).
+-> LaneNotSafe(0, 0, achangeright).
+-> DistanceBehind(0, 1, -11, 5, amovestraight).
+-> SpeedBehind(0, 1, -11, 2, amovestraight).
+-> DistanceFront(0, 1, 12, 5, amovestraight).
+-> SpeedFront(0, 1, 12, 2, amovestraight).
+-> LaneSafe(0, 1, amovestraight).
+-> DistanceBehind(0, 2, 4, 0, achangeleft).
+-> SpeedBehind(0, 2, 4, 5, achangeleft).
+-> LaneNotSafe(0, 2, achangeleft).
+-> DistanceBehind(0, 1, -11, 5, adeceleratestraight).
+-> SpeedBehind(0, 1, -11, 2, adeceleratestraight).
+-> DistanceFront(0, 1, 12, 5, adeceleratestraight).
+-> SpeedFront(0, 1, 12, 2, adeceleratestraight).
+-> LaneSafe(0, 1, adeceleratestraight).
+-> DistanceBehind(0, 1, -11, 5, aacceleratestraight).
+-> SpeedBehind(0, 1, -11, 2, aacceleratestraight).
+-> DistanceFront(0, 1, 12, 5, aacceleratestraight).
+-> SpeedFront(0, 1, 12, 2, aacceleratestraight).
+-> LaneSafe(0, 1, aacceleratestraight).
+-> DistanceFront(0, 0, 5, 0, aaccelerateright).
+-> SpeedFront(0, 0, 5, 1, aaccelerateright).
+-> LaneNotSafe(0, 0, aaccelerateright).
+-> DistanceFront(0, 0, 5, 0, adecelerateright).
+-> SpeedFront(0, 0, 5, 1, adecelerateright).
+-> LaneNotSafe(0, 0, adecelerateright).
+-> DistanceBehind(0, 2, 4, 0, adecelerateleft).
+-> SpeedBehind(0, 2, 4, 5, adecelerateleft).
+-> LaneNotSafe(0, 2, adecelerateleft).
+-> EgoCar(0, 1, 5, 3).
+-> SuggestedAction(0, amovestraight).
+-> SuggestedAction(0, adeceleratestraight).
+-> SuggestedAction(0, aacceleratestraight).
+-> DistanceBehind(1, 2, -11, 5, achangeleft).
+-> SpeedBehind(1, 2, -11, 5, achangeleft).
+-> DistanceFront(1, 2, 12, 5, achangeleft).
+-> SpeedFront(1, 2, 12, 5, achangeleft).
+-> LaneSafe(1, 2, achangeleft).
+-> DistanceBehind(1, 1, -11, 5, amovestraight).
+-> SpeedBehind(1, 1, -11, 2, amovestraight).
+-> DistanceFront(1, 1, 7, 1, amovestraight).
+-> SpeedFront(1, 1, 7, 2, amovestraight).
+-> LaneNotSafe(1, 1, amovestraight).
+-> DistanceFront(1, 0, 5, 0, achangeright).
+-> SpeedFront(1, 0, 5, 1, achangeright).
+-> LaneNotSafe(1, 0, achangeright).
+-> DistanceBehind(1, 1, -11, 5, adeceleratestraight).
+-> SpeedBehind(1, 1, -11, 2, adeceleratestraight).
+-> DistanceFront(1, 1, 7, 1, adeceleratestraight).
+-> SpeedFront(1, 1, 7, 2, adeceleratestraight).
+-> LaneSafe(1, 1, adeceleratestraight).
+-> DistanceBehind(1, 1, -11, 5, aacceleratestraight).
+-> SpeedBehind(1, 1, -11, 2, aacceleratestraight).
+-> DistanceFront(1, 1, 7, 1, aacceleratestraight).
+-> SpeedFront(1, 1, 7, 2, aacceleratestraight).
+-> LaneNotSafe(1, 1, aacceleratestraight).
+-> DistanceBehind(1, 2, -11, 5, aaccelerateleft).
+-> SpeedBehind(1, 2, -11, 5, aaccelerateleft).
+-> DistanceFront(1, 2, 12, 5, aaccelerateleft).
+-> SpeedFront(1, 2, 12, 5, aaccelerateleft).
+-> LaneSafe(1, 2, aaccelerateleft).
+-> DistanceFront(1, 0, 5, 0, aaccelerateright).
+-> SpeedFront(1, 0, 5, 1, aaccelerateright).
+-> LaneNotSafe(1, 0, aaccelerateright).
+-> DistanceFront(1, 0, 5, 0, adecelerateright).
+-> SpeedFront(1, 0, 5, 1, adecelerateright).
+-> LaneNotSafe(1, 0, adecelerateright).
+-> DistanceBehind(1, 2, -11, 5, adecelerateleft).
+-> SpeedBehind(1, 2, -11, 5, adecelerateleft).
+-> DistanceFront(1, 2, 12, 5, adecelerateleft).
+-> SpeedFront(1, 2, 12, 5, adecelerateleft).
+-> LaneSafe(1, 2, adecelerateleft).
+-> EgoCar(1, 1, 5, 3).
+-> SuggestedAction(1, achangeleft).
+-> SuggestedAction(1, adeceleratestraight).
+-> SuggestedAction(1, aaccelerateleft).
+-> SuggestedAction(1, adecelerateleft).
+-> VariantName(0).
+-> VariantName(1).
+
+-> CertifiedVariant(0).
+-> UpdatedVariant(1).
+
+-> ActionName(achangeright).
+-> ActionName(amovestraight).
+-> ActionName(achangeleft).
+-> ActionName(adeceleratestraight).
+-> ActionName(aacceleratestraight).
+-> ActionName(adecelerateright).
+-> ActionName(aaccelerateright).
+-> ActionName(adecelerateleft).
+-> ActionName(aaccelerateleft).
+
+
+!=(xv, 0), !=(xv, 1) || -> NotAVariantName(xv).
+
+t !=(xenl, -(xecl,1)) || -> NotDecByOne(xenl, xecl).
+t !=(xenl, +(xecl,1)) || -> NotIncByOne(xenl, xecl).
+
+
+t <(+(xes, 1), xobs) || -> BehindAcceleratedSpeedLessThanOtherSpeed(xes, xobs).
+t <(-(xes, 1), xobs) || -> BehindDeceleratedSpeedLessThanOtherSpeed(xes, xobs).
+
+t >(+(xes, 1), xfd) || -> FrontAcceleratedSpeedLargerThanDistance(xes, xfd).
+t >(-(xes, 1), xfd) || -> FrontDeceleratedSpeedLargerThanDistance(xes, xfd).
+
+t >(+(xes, 1), xofs) || -> FrontAcceleratedSpeedLargerThanOtherSpeed(xes, xofs).
+t >(-(xes, 1), xofs) || -> FrontDeceleratedSpeedLargerThanOtherSpeed(xes, xofs).
+
+UpdatedVariant(xv1), SuggestedAction(xv1,xa), CertifiedVariant(xv2), LaneNotSafe(xv2, xl, xa) -> UpdatedCrossContradicted(xv1,xv2,xa).
+
+UpdatedCrossContradicted(xv1,xv2,xa) -> ResultDeg(xv1,xv2,xa).
+ResultDeg(xv1,xv2,xa) ->.

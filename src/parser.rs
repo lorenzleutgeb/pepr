@@ -1,8 +1,8 @@
 use crate::Constraint;
 use crate::{
     bail, debug_unreachable, fmt::DisplayWithSymbols, symbols::Term, Atom, CAtom, CPredicate,
-    CTerm, Clause, ConstantData, Constants, Interner, Parents, PredicateData, Predicates, State,
-    Symbols, Typ, VariableData, Variables,
+    CTerm, Clause, ConstantData, Interner, Parents, PredicateData, State, Symbols, Typ,
+    VariableData, Variables,
 };
 use core::panic;
 
@@ -109,28 +109,12 @@ impl State {
     pub fn parse_str(str: &str) -> Option<State> {
         match FTCNFParser::parse(Rule::input, str) {
             Ok(pairs) => Some(State::parse(pairs)),
-            Err(_) => None,
+            Err(e) => panic!("{}", e),
         }
     }
 
     pub fn parse(pairs: Pairs<Rule>) -> State {
-        let mut state = State {
-            symbols: Symbols {
-                predicates: Predicates {
-                    interner: Interner::new(),
-                    data: vec![],
-                },
-                constants: Constants {
-                    interner: Interner::new(),
-                    data: vec![],
-                },
-                variables: Variables {
-                    interner: Interner::new(),
-                    data: vec![],
-                },
-            },
-            clauses: vec![],
-        };
+        let mut state = State::new();
 
         for pair in pairs {
             match pair.as_rule() {
@@ -150,7 +134,7 @@ impl State {
 }
 
 impl Clause {
-    fn parse(state: &mut State, pair: Pair<Rule>) {
+    fn parse<'a>(state: &mut State, pair: Pair<Rule>) {
         let variables = &mut Variables {
             interner: Interner::new(),
             data: vec![],
@@ -172,20 +156,19 @@ impl Clause {
             }
         }
 
-        let clause = Clause {
-            id: state.clauses.len(),
+        let typs: Vec<Typ> = variables.data.iter().map(|d| d.typ).collect();
+
+        state.ingest_clause(Clause {
+            id: 0,
             constraint: Constraint {
                 atoms: catoms.into_boxed_slice(),
+                solution: None,
             },
-            atoms: atoms.into_boxed_slice(),
             arrow,
+            atoms: atoms.into_boxed_slice(),
             parents: Parents::Input,
-            typs: variables.data.iter().map(|d| d.typ).collect(),
-        };
-
-        println!("{}", clause.display(&state.symbols));
-
-        state.clauses.push(clause);
+            typs: typs.into_boxed_slice(),
+        })
     }
 }
 
@@ -351,36 +334,45 @@ impl Atom {
 
 impl Term {
     fn parse(symbols: &mut Symbols, clause_variables: &mut Variables, pair: Pair<Rule>) -> Term {
+        let span = pair.as_span();
         for inner in pair.into_inner() {
             match inner.as_rule() {
-                Rule::natural0 => return Term::Integer(inner.as_str().parse().unwrap()),
+                Rule::integer => return Term::Integer(inner.as_str().parse().unwrap()),
                 Rule::constant => {
-                    // TODO: Fix type.
-                    return Term::Constant(
-                        symbols
-                            .constants
-                            .interner
-                            .get_or_intern(inner.as_str())
-                            .get(),
-                        Typ::R,
-                    );
+                    let s = inner.as_str();
+                    let t = symbols
+                        .constants
+                        .interner
+                        .get(s)
+                        .map_or(Default::default(), |i| {
+                            symbols.constants.data[i.to_usize()].typ
+                        });
+                    let c = symbols.constants.interner.get_or_intern(s);
+                    if c.to_usize() == symbols.constants.data.len() {
+                        symbols.constants.data.push(ConstantData { typ: t })
+                    }
+                    return Term::Constant(c.into(), t);
                 }
                 Rule::variable => {
                     // First check variables from preamble, then fall back to clause variables.
                     let s = inner.as_str();
-                    let t = match symbols.variables.interner.get(s) {
-                        Some(v) => symbols.variables.data[v.to_usize()].typ,
-                        None => Typ::R,
-                    };
+                    let t = symbols
+                        .variables
+                        .interner
+                        .get(s)
+                        .map_or(Default::default(), |i| {
+                            symbols.variables.data[i.to_usize()].typ
+                        });
                     let v = clause_variables.interner.get_or_intern(inner.as_str());
                     if v.to_usize() == clause_variables.data.len() {
                         clause_variables.data.push(VariableData { typ: t })
                     }
-                    return Term::Variable(v.get(), t);
+                    return Term::Variable(v.into(), t);
                 }
                 _ => debug_unreachable!(),
             }
         }
+        bail_from_span(String::from("Unparseable"), 2, span);
         debug_unreachable!();
     }
 }

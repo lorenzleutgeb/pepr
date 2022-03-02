@@ -15,7 +15,7 @@ natural0 = { "0" | natural1 }
 
 // Integer numbers, positive and negative.
 // Zero must be written exactly "0", leading zeroes and "-0" are not allowed.
-integer = _{ "0" | ("-"? ~ natural1) }
+integer = { "0" | ("-"? ~ natural1) }
 
 rif = { "R" | "I" | "F" }
 
@@ -23,7 +23,7 @@ variable = { ("x" | "y" | "z" | "u" | "v" | "w") ~ ASCII_ALPHANUMERIC_LOWER* ~ r
 
 constant = { ("a" | "b" | "c" | "d") ~ ASCII_ALPHANUMERIC_LOWER* ~ rif? }
 
-term = { variable | constant | natural0 }
+term = { variable | constant | integer }
 
 catom = { (le | ge | lt | gt | eq | ne) ~ "(" ~ cterm ~ "," ~ cterm ~ ")" }
     le = { "<=" | "≤" }

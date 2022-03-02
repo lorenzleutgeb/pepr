@@ -1,17 +1,37 @@
-use crate::{substitution::Substitution, Clause};
+use crate::{
+    substitution::{self, *},
+    symbols::Term,
+    Clause,
+};
 
 impl Clause {
-    fn subsumes(&self, other: &Clause, substitution: &mut Substitution) -> bool {
+    pub(crate) fn subsumes(&self, other: &Clause) -> bool {
         if self.conclusions() > other.conclusions() || self.premises() > other.premises() {
-            return false;
+            false
+        } else {
+            let mut sigma: SubstitutionWithHistory<Vec<Option<Term>>> = Default::default();
+            self.subsumes_rec(other, &mut sigma, 0)
         }
-        substitution.start();
-        let result = self.subsumes_rec(other, substitution, 0);
-        substitution.stop();
-        result
     }
 
-    fn subsumes_rec(&self, other: &Clause, substitution: &mut Substitution, index: usize) -> bool {
+    pub(crate) fn subsumes_with_substitution<T: Substitution + Snapshots>(
+        &self,
+        other: &Clause,
+        substitution: &mut T,
+    ) -> bool {
+        if self.conclusions() > other.conclusions() || self.premises() > other.premises() {
+            false
+        } else {
+            self.subsumes_rec(other, substitution, 0)
+        }
+    }
+
+    fn subsumes_rec<T: Substitution + Snapshots>(
+        &self,
+        other: &Clause,
+        substitution: &mut T,
+        index: usize,
+    ) -> bool {
         if index >= self.atoms.len() {
             return true;
         }
@@ -30,10 +50,16 @@ impl Clause {
             {
                 return true;
             }
-            substitution.backtrack(snapshot);
+            substitution.rollback(snapshot);
         }
 
         false
+    }
+
+    fn subsumes_c(&self, other: &Clause, sigma: &dyn Substitution) -> bool {
+        other
+            .constraint
+            .implies(&self.constraint.subsititute(sigma))
     }
 }
 
@@ -42,7 +68,7 @@ mod tests {
 
     use itertools::Itertools;
 
-    use crate::{symbols::Term, Atom, Typ};
+    use crate::{substitution, symbols::Term, Atom, Typ};
 
     use super::*;
 
@@ -67,9 +93,7 @@ mod tests {
             vec![],
         );
 
-        let s = &mut Substitution::new();
-
-        assert!(subsumes.subsumes(&subsumed, s))
+        assert!(subsumes.subsumes(&subsumed))
     }
 
     #[test]
@@ -93,9 +117,7 @@ mod tests {
             vec![],
         );
 
-        let s = &mut Substitution::new();
-
-        assert!(!subsumes.subsumes(&subsumed, s))
+        assert!(!subsumes.subsumes(&subsumed))
     }
 
     #[test]
@@ -177,8 +199,7 @@ mod tests {
                 .collect(),
         );
 
-        let substitution = &mut Substitution::new();
-        assert!(l1.subsumes(&r, substitution));
-        assert!(!l2.subsumes(&r, substitution));
+        assert!(l1.subsumes(&r));
+        assert!(!l2.subsumes(&r));
     }
 }
