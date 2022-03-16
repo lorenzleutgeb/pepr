@@ -33,7 +33,7 @@ impl Clause {
         index: usize,
     ) -> bool {
         if index >= self.atoms.len() {
-            return true;
+            return other.constraint.implies(&self.constraint);
         }
 
         let (premises, conclusions) = other.split_at_arrow();

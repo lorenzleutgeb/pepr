@@ -1,4 +1,5 @@
 use std::fmt::Display;
+use std::num::NonZeroUsize;
 
 use crate::util::default_combine;
 
@@ -8,6 +9,10 @@ pub type Variable = u32;
 pub type Constant = u32;
 pub type Integer = i32;
 pub type Predicate = usize;
+
+/// FO predicate symbol used for axiomatisation of LRA predicate '!='.
+/// This does not parse as FO predicate symbol on purpose.
+pub const NEQ: &str = "≠";
 
 #[derive(Debug, PartialEq, Eq, PartialOrd, Clone, Copy, Ord, Hash)]
 pub(crate) enum Typ {
@@ -76,7 +81,7 @@ impl Display for Term {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Term::Constant(c, _) => write!(f, "c{}", c),
-            Term::Variable(v, _) => write!(f, "_{}", v),
+            Term::Variable(v, _) => write!(f, "x{}", v),
             Term::Integer(i) => write!(f, "{}", i),
         }
     }
@@ -168,6 +173,13 @@ impl Display for CTerm {
 }
 
 impl CTerm {
+    pub(crate) fn is_immdediate(&self) -> bool {
+        match self {
+            CTerm::Inj(_) => true,
+            _ => false,
+        }
+    }
+
     pub(crate) fn max_var(&self) -> Option<Variable> {
         match self {
             CTerm::Inj(t) => t.max_var(),
@@ -189,17 +201,17 @@ impl CTerm {
             CTerm::Inj(Term::Variable(x, _)) => vec![*x],
             CTerm::Inj(_) => vec![],
             CTerm::Add(args) => {
-                let result: Vec<Variable> = args[0].var_occurrences();
+                let mut result: Vec<Variable> = args[0].var_occurrences();
                 result.append(&mut args[1].var_occurrences());
                 result
             }
             CTerm::Mul(args) => {
-                let result: Vec<Variable> = args[0].var_occurrences();
+                let mut result: Vec<Variable> = args[0].var_occurrences();
                 result.append(&mut args[1].var_occurrences());
                 result
             }
             CTerm::Sub(args) => {
-                let result: Vec<Variable> = args[0].var_occurrences();
+                let mut result: Vec<Variable> = args[0].var_occurrences();
                 result.append(&mut args[1].var_occurrences());
                 result
             }
@@ -252,7 +264,7 @@ impl CAtom {
     }
 
     pub(crate) fn var_occurrences(&self) -> Vec<Variable> {
-        let result = self.left.var_occurrences();
+        let mut result = self.left.var_occurrences();
         result.append(&mut self.right.var_occurrences());
         result
     }
@@ -272,7 +284,6 @@ impl Atom {
         }
     }
 
-    #[cfg(test)]
     pub(crate) fn propositional(predicate: Predicate) -> Atom {
         Atom {
             predicate,
@@ -335,6 +346,32 @@ impl<'a> IntoIterator for &'a Atom {
 }
 
 #[derive(Debug, PartialEq, Eq)]
+pub(crate) enum ClauseId {
+    Input(u32),
+    Axiom(u32),
+    Resolvent(u32),
+}
+
+impl Into<u32> for &ClauseId {
+    fn into(self) -> u32 {
+        match self {
+            ClauseId::Input(x) | ClauseId::Axiom(x) | ClauseId::Resolvent(x) => *x,
+        }
+    }
+}
+
+impl Display for ClauseId {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let modifier = match self {
+            ClauseId::Input(_) => "INP",
+            ClauseId::Axiom(_) => "AXM",
+            ClauseId::Resolvent(_) => "",
+        };
+        write!(f, "{}{}", modifier, <&Self as Into<u32>>::into(self))
+    }
+}
+
+#[derive(Debug, PartialEq, Eq)]
 pub(crate) struct ClausePosition {
     pub(crate) clause: usize,
     pub(crate) literal: usize,
@@ -348,7 +385,8 @@ impl ClausePosition {
 
 impl Display for ClausePosition {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}.{}", self.clause, self.literal)
+        // Add one to get human-readable atom indices.
+        write!(f, "{}.{}", self.clause, self.literal + 1)
     }
 }
 
@@ -398,6 +436,15 @@ impl std::fmt::Debug for Constraint {
             .field("atoms", &self.atoms)
             .field("solution", &self.solution.is_some())
             .finish()
+    }
+}
+
+impl Constraint {
+    pub(crate) fn new(atoms: Box<[CAtom]>) -> Constraint {
+        Constraint {
+            atoms,
+            solution: None,
+        }
     }
 }
 

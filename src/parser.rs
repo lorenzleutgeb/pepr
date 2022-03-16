@@ -2,7 +2,7 @@ use crate::Constraint;
 use crate::{
     bail, debug_unreachable, fmt::DisplayWithSymbols, symbols::Term, Atom, CAtom, CPredicate,
     CTerm, Clause, ConstantData, Interner, Parents, PredicateData, State, Symbols, Typ,
-    VariableData, Variables,
+    VariableData, Variables, NEQ,
 };
 use core::panic;
 
@@ -158,7 +158,7 @@ impl Clause {
 
         let typs: Vec<Typ> = variables.data.iter().map(|d| d.typ).collect();
 
-        state.ingest_clause(Clause {
+        let mut clause = Clause {
             id: 0,
             constraint: Constraint {
                 atoms: catoms.into_boxed_slice(),
@@ -168,7 +168,10 @@ impl Clause {
             atoms: atoms.into_boxed_slice(),
             parents: Parents::Input,
             typs: typs.into_boxed_slice(),
-        })
+        };
+
+        clause = clause.rewrite_ne(&state.symbols);
+        state.ingest_clause(clause);
     }
 }
 
@@ -369,7 +372,13 @@ impl Term {
                     }
                     return Term::Variable(v.into(), t);
                 }
-                _ => debug_unreachable!(),
+                Rule::term => {
+                    return Term::parse(symbols, clause_variables, inner);
+                }
+                _ => {
+                    bail_from_span(String::from("Unparseable"), 2, span);
+                    debug_unreachable!();
+                }
             }
         }
         bail_from_span(String::from("Unparseable"), 2, span);

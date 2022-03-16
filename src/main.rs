@@ -1,8 +1,11 @@
 // There are lots of unused functions that I sketched,
 // let them stick around.
 #![allow(dead_code)]
+#![allow(unused_imports)]
 
 mod cli;
+mod dimacs;
+mod fm;
 mod fmt;
 mod index;
 mod la;
@@ -160,8 +163,13 @@ impl State {
     fn add_axioms(&mut self) {
         debug_assert!(self.clauses.is_empty());
         debug_assert!(self.symbols.constants.data.is_empty());
-        debug_assert!(self.symbols.constants.interner.len() == 0);
-        let neq = self.symbols.constants.interner.get_or_intern_static("Neq");
+        debug_assert!(self.symbols.constants.interner.is_empty());
+        let neq = self.symbols.predicates.interner.get_or_intern_static(NEQ);
+
+        self.symbols
+            .predicates
+            .data
+            .push(PredicateData { arity: 2 });
 
         self.clauses.push(Clause {
             constraint: Constraint {
@@ -174,7 +182,7 @@ impl State {
                 solution: None,
             },
             atoms: vec![Atom::new(
-                neq.into(),
+                neq,
                 vec![Term::Variable(0, Typ::R), Term::Variable(1, Typ::R)],
             )]
             .into_boxed_slice(),
@@ -195,11 +203,11 @@ impl State {
                 solution: None,
             },
             atoms: vec![Atom::new(
-                neq.into(),
+                neq,
                 vec![Term::Variable(0, Typ::R), Term::Variable(1, Typ::R)],
             )]
             .into_boxed_slice(),
-            id: 0,
+            id: 1,
             arrow: 0,
             typs: vec![Typ::R, Typ::R].into_boxed_slice(),
             parents: Parents::Axiom,
@@ -207,7 +215,7 @@ impl State {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 struct PredicateData {
     arity: usize,
     // TODO: Also store the types of arguments.

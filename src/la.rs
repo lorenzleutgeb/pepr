@@ -3,8 +3,9 @@
 use crate::fmt::DisplayWithSymbols;
 use crate::{symbols::*, *};
 
+use good_lp::solvers::minilp::MiniLpSolution;
 use good_lp::Variable as LPVariable;
-use good_lp::{Expression, ProblemVariables, Variable, VariableDefinition};
+use good_lp::{Expression, ProblemVariables, VariableDefinition};
 use good_lp::{ResolutionError, Solution, SolverModel};
 use itertools::Itertools;
 
@@ -12,7 +13,7 @@ use std::ops::Mul;
 
 use std::ops::Deref;
 
-const EPISLON: f64 = 1. / 1000.;
+const EPSILON: f64 = 1. / 1000.;
 
 impl CTerm {
     fn encode(&self, variables: &Vec<LPVariable>) -> Expression {
@@ -46,25 +47,29 @@ impl CTerm {
 }
 
 impl CAtom {
-    fn encode(&self, variables: &Vec<LPVariable>) -> Option<good_lp::Constraint> {
+    fn encode(&self, variables: &Vec<LPVariable>) -> good_lp::Constraint {
         let left: Expression = self.left.encode(variables);
         let right: Expression = self.right.encode(variables);
         match self.predicate {
-            CPredicate::Eq => Some(left.eq(right)),
-            CPredicate::Le => Some(left.leq(right)),
-            CPredicate::Ge => Some(left.geq(right)),
-            CPredicate::Gt => Some(left.geq(right + <Expression>::from(EPISLON))),
-            CPredicate::Lt => Some(left.leq(right - <Expression>::from(EPISLON))),
-            _ => {
-                warn!("Predicate '{}' is not implemented. The atom '{}' will be dropped. Results might be incorrect.", self.predicate, self);
-                None
-            }
+            CPredicate::Eq => left.eq(right),
+            CPredicate::Le => left.leq(right),
+            CPredicate::Ge => left.geq(right),
+            CPredicate::Gt => left.geq(right + <Expression>::from(EPSILON)),
+            CPredicate::Lt => left.leq(right - <Expression>::from(EPSILON)),
+
+            // Inequality cannot be directly encoded.
+            // This is worked around by axiomatising,
+            // and by negating as '<' or '>'.
+            CPredicate::Ne => debug_unreachable!(),
         }
     }
 }
 
 impl Constraint {
-    pub fn encode(&self, pv: &mut ProblemVariables) -> (Expression, Vec<good_lp::Constraint>) {
+    pub fn encode(
+        &self,
+        pv: &mut ProblemVariables,
+    ) -> (Expression, Vec<good_lp::Constraint>, Vec<LPVariable>) {
         let max_var = self
             .atoms
             .iter()
@@ -90,34 +95,38 @@ impl Constraint {
         constraints.push(sum.eq(e1 - e2));
 
         for atom in self.atoms.deref() {
-            let encoded = atom.encode(&vars);
-            if let Some(c) = encoded {
-                constraints.push(c);
-            }
+            constraints.push(atom.encode(&vars));
         }
 
-        (objective, constraints)
+        (objective, constraints, vars)
     }
 
-    pub fn satisfiable(&mut self) -> bool {
+    pub fn mut_satisfiable(&mut self) -> bool {
+        if self.atoms.is_empty() || self.solution.is_some() {
+            true
+        } else if let Ok(solution) = self.solve() {
+            self.solution = Some(solution);
+            true
+        } else {
+            false
+        }
+    }
+
+    pub fn satisfiable(&self) -> bool {
         if self.atoms.is_empty() || self.solution.is_some() {
             true
         } else {
-            self.solve();
-            self.solution.is_some()
+            self.solve().is_ok()
         }
     }
 
-    pub fn solve(&mut self) -> Result<(), ResolutionError> {
+    pub fn solve(&self) -> Result<MiniLpSolution, ResolutionError> {
         let mut variables = ProblemVariables::new();
         let encoded = self.encode(&mut variables);
         match solve(variables, encoded.0, encoded.1) {
-            Ok(solution) => {
-                self.solution = Some(solution);
-                Ok(())
-            }
             Err(ResolutionError::Infeasible) => Err(ResolutionError::Infeasible),
             Err(e) => panic!("{}", e),
+            ok => ok,
         }
     }
 
@@ -126,7 +135,7 @@ impl Constraint {
     }
 
     /// An implicitly negated disjunction.
-    pub(crate) fn negate(&self) -> Vec<CAtom> {
+    fn negate(&self) -> Vec<CAtom> {
         self.atoms
             .iter()
             .flat_map(|atom| atom.negate())
@@ -135,15 +144,25 @@ impl Constraint {
 
     pub(crate) fn implies(&self, other: &Constraint) -> bool {
         if other.is_empty() {
-            return true;
+            true
+        } else if self.is_empty() {
+            other.satisfiable()
+        } else if !self.contains_all_vars(other) {
+            // There is a variable that occurs in `other`, but not in `self`.
+            // We would have to eliminate it, but this is not implemented.
+            // Conservatively return false.
+            false
+        } else {
+            other.negate().iter().all(|atom| {
+                let mut pv = ProblemVariables::new();
+                let mut self_encoded = self.encode(&mut pv);
+                self_encoded.1.push(atom.encode(&self_encoded.2));
+                solve(pv, self_encoded.0, self_encoded.1).is_err()
+            })
         }
+    }
 
-        if self.is_empty() {
-            return other.satisfiable();
-        }
-
-        // Make sure that the variables in `other` is a subset of the vars in `self`.
-        // Otherwise we need quantifier eliminiation.
+    fn contains_all_vars(&self, other: &Constraint) -> bool {
         let other_vars = other
             .atoms
             .iter()
@@ -156,24 +175,12 @@ impl Constraint {
             .collect_vec();
 
         for var in other_vars {
-            if self_vars.iter().find(|&x| *x == var).is_none() {
-                // This variable is in `other`, but not in `self`.
-                // We would have to eliminate it, but this is not implemented.
+            if !self_vars.iter().any(|x| *x == var) {
                 return false;
             }
         }
 
-        for atom in other.negate() {
-            let mut pv = ProblemVariables::new();
-            let mut self_encoded = self.encode(&mut pv);
-            let mut atom_encoded = atom.encode(&mut pv);
-            self_encoded.1.append(&mut atom_encoded.1);
-            if solve(pv, self_encoded.0 + atom_encoded.0, self_encoded.1).is_ok() {
-                return true;
-            }
-        }
-
-        false
+        true
     }
 }
 
@@ -225,9 +232,7 @@ impl Clause {
 
         for atom in self.constraint.atoms.deref() {
             let encoded = atom.encode(&vars);
-            if let Some(c) = encoded {
-                problem = problem.with(c);
-            }
+            problem = problem.with(encoded);
         }
         match problem.solve() {
             Ok(solution) => {
@@ -236,5 +241,61 @@ impl Clause {
             Err(ResolutionError::Infeasible) => {}
             Err(e) => panic!("{}", e),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn implication() {
+        let x: Term = Term::Variable(0, Typ::R);
+        let y: Term = Term::Variable(1, Typ::R);
+        let one: Term = Term::Integer(1);
+        let two: Term = Term::Integer(2);
+
+        let xeqy: Constraint = Constraint::new(
+            vec![CAtom {
+                predicate: CPredicate::Eq,
+                left: CTerm::Inj(x),
+                right: CTerm::Inj(y),
+            }]
+            .into_boxed_slice(),
+        );
+
+        let xgey: Constraint = Constraint::new(
+            vec![CAtom {
+                predicate: CPredicate::Ge,
+                left: CTerm::Inj(x),
+                right: CTerm::Inj(y),
+            }]
+            .into_boxed_slice(),
+        );
+
+        let xeq2: Constraint = Constraint::new(
+            vec![CAtom {
+                predicate: CPredicate::Eq,
+                left: CTerm::Inj(x),
+                right: CTerm::Inj(two),
+            }]
+            .into_boxed_slice(),
+        );
+
+        let xge1: Constraint = Constraint::new(
+            vec![CAtom {
+                predicate: CPredicate::Ge,
+                left: CTerm::Inj(x),
+                right: CTerm::Inj(one),
+            }]
+            .into_boxed_slice(),
+        );
+
+        assert_eq!(xeqy.implies(&xeqy), true);
+        assert_eq!(xeqy.implies(&xgey), true);
+        assert_eq!(xgey.implies(&xeqy), false);
+        assert_eq!(xgey.implies(&xgey), true);
+        assert_eq!(xeq2.implies(&xge1), true);
+        assert_eq!(xge1.implies(&xeq2), false);
     }
 }

@@ -18,16 +18,16 @@ impl Term {
 
         match (self, other) {
             (Term::Integer(_), Term::Integer(_)) => Err(Error::Match),
-            (Term::Variable(v, tv), Term::Integer(_i)) => {
+            (Term::Variable(v, tv), Term::Integer(_)) => {
                 if tv.contains(Typ::I) {
                     Ok(Some((*v, other)))
                 } else {
                     Err(Error::Type)
                 }
             }
-            (Term::Integer(_i), Term::Variable(v, tv)) => {
+            (Term::Integer(_), Term::Variable(v, tv)) => {
                 if tv.contains(Typ::I) {
-                    Ok(Some((*v, other)))
+                    Ok(Some((*v, self)))
                 } else {
                     Err(Error::Type)
                 }
@@ -187,6 +187,25 @@ mod tests {
                 vec![Term::Variable(0, Typ::F), Term::Constant(1, Typ::F)].into(),
                 Ok(vec![
                     Some(Term::Constant(1, Typ::F)),
+                    Some(Term::Constant(0, Typ::F)),
+                ]),
+            ),
+            (
+                vec![
+                    Term::Variable(0, Typ::R),
+                    Term::Variable(1, Typ::R),
+                    Term::Variable(2, Typ::F),
+                ]
+                .into(),
+                vec![
+                    Term::Integer(0),
+                    Term::Integer(1),
+                    Term::Constant(0, Typ::F),
+                ]
+                .into(),
+                Ok(vec![
+                    Some(Term::Integer(0)),
+                    Some(Term::Integer(1)),
                     Some(Term::Constant(0, Typ::F)),
                 ]),
             ),

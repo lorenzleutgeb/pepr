@@ -25,5 +25,4 @@ Cr1W2(x,y) -> Sl1W2(0,y).
 Cr1Cr2(x,y) -> Cr1Sl2(x,0).
 
 >(x,0), >(y,0) || -> Sl1Sl2(x,y).
-
->(x,0), <(x, 0) || -> Impossible(x).
+Cr1W2(x,y) -> .

@@ -82,24 +82,28 @@ impl DisplayWithSymbols for CAtom {
 
 impl DisplayWithSymbols for Atom {
     fn fmt_internal(&self, symbols: &Symbols, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        if let Err(e) = write!(
+        write!(
             f,
-            "{}(",
+            "{}",
             symbols.predicates.interner.resolve(self.predicate).unwrap()
-        ) {
-            return Err(e);
+        )?;
+
+        if !self.terms.is_empty() {
+            write!(f, "(")?;
         }
+
         for (index, term) in self.into_iter().enumerate() {
-            if let Err(e) = term.fmt_internal(symbols, f) {
-                return Err(e);
-            }
+            term.fmt_internal(symbols, f)?;
             if index < self.terms.len() - 1 {
-                if let Err(e) = write!(f, ", ") {
-                    return Err(e);
-                }
+                write!(f, ", ")?;
             }
         }
-        write!(f, ")")
+
+        if !self.terms.is_empty() {
+            write!(f, ")")?;
+        }
+
+        Ok(())
     }
 }
 
@@ -141,7 +145,7 @@ impl DisplayWithSymbols for Clause {
         write!(
             f,
             "{}:{}:{}:{}:{}: {}{} → {}.",
-            self.id,
+            self.id, // self.id.map_or(String::from("?"), |id| id.to_string()),
             self.atoms.len(),
             self.typs.len(),
             self.parents,
@@ -150,5 +154,16 @@ impl DisplayWithSymbols for Clause {
             premise_str,
             conclusion_str
         )
+    }
+}
+
+impl Display for State {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::result::Result<(), std::fmt::Error> {
+        let mut result = Ok(());
+        for clause in self.clauses.iter() {
+            result = clause.fmt_internal(&self.symbols, f).and(writeln!(f));
+            result?;
+        }
+        result
     }
 }

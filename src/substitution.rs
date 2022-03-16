@@ -36,15 +36,13 @@ pub(crate) trait Substitution {
         let mut min = x;
         let mut norm = self.get(x);
 
-        if norm.is_none() {
-            return None;
-        }
+        norm?;
 
         loop {
             let once = self.get(next);
             match once {
-                Some(Term::Variable(y, tau)) => {
-                    if y == min {
+                Some(Term::Variable(y, _)) => {
+                    if y == min || y == x {
                         return norm;
                     } else if y < min {
                         min = y;
@@ -54,7 +52,7 @@ pub(crate) trait Substitution {
                         next = y;
                     }
                 }
-                None => return None,
+                None => return norm,
                 other => return other,
             }
         }
@@ -243,10 +241,9 @@ impl Substitution for Vec<Option<Term>> {
 
             let mut y = x;
             let mut min = x;
-            let mut flattened: Option<Term> = None;
+            let mut flattened: Option<Term>;
             loop {
                 let step = self.get(y);
-                dbg!(step);
                 match step {
                     Some(Term::Variable(z, _)) => {
                         if z == min {
@@ -440,8 +437,6 @@ impl<T: Substitution + Default> Snapshots for SubstitutionWithHistory<T> {
 
         while self.history.len() != snapshot {
             let top = self.history.pop().unwrap();
-            let i = top.variable as usize;
-
             if let Some(term) = top.previous {
                 self.substitution.set(top.variable, term);
             }
@@ -558,5 +553,11 @@ mod tests {
             assert_eq!(s.get(i as u32), None);
             //assert_eq!(s.storage[i], Default::default());
         }
+    }
+
+    #[test]
+    fn chase() {
+        let sigma: Vec<Option<Term>> = vec![None, Some(Term::Variable(0, Typ::F))];
+        assert_eq!(sigma.chase(1), Some(Term::Variable(0, Typ::F)))
     }
 }

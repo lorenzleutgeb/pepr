@@ -1,5 +1,5 @@
 use crate::{
-    symbols::Term,
+    symbols::*,
     unification::{self, unify_at},
     Clause, ClausePosition, Constraint, Parents,
 };
@@ -89,7 +89,11 @@ pub(crate) fn resolve_with_subst(
             },
         ),
     };
+    // dbg!(&resolvent.constraint.atoms);
+    // dbg!(&resolvent.atoms);
     resolvent.normalize();
+    // dbg!(&resolvent.constraint.atoms);
+    // dbg!(&resolvent.atoms);
     resolvent
 }
 
@@ -184,7 +188,6 @@ mod tests {
     fn with_terms() {
         let x = Term::Variable(0, Typ::F);
         let y = Term::Variable(1, Typ::F);
-        let z = Term::Variable(2, Typ::F);
         let a = Term::Constant(0, Typ::F);
         let b = Term::Constant(1, Typ::F);
         let resolvent = resolve(
@@ -213,5 +216,41 @@ mod tests {
             .into_boxed_slice(),
         );
         assert_eq!(resolvent.arrow, 2);
+    }
+
+    #[test]
+    fn with_constraint() {
+        /*
+        let a = Clause {
+            id: 0,
+            arrow: 5,
+            atoms: vec![
+                Atom { predicate: 1, atoms: vec![]}
+            ].into_boxed_slice(),
+            constraint: Constraint {
+                atoms: vec![CAtom {
+                    predicate: CPredicate::Ge,
+                    left: CTerm::Inj(Term::Variable(0, Typ::R)),
+                    right: CTerm::Inj(Term::Variable(0, Typ::R)),
+                }].into_boxed_slice(),
+                solution: None,
+            }
+        };
+
+        let b = Clause::dummy(vec![], vec![Atom {
+            predicate: 0,
+            terms: vec![
+                Term::Integer(0),
+                Term::Integer(2),
+                Term::Integer(4),
+                Term::Integer(0),
+                Term::Constant(0, Typ::F),
+            ].into_boxed_slice(),
+        }]);
+        */
+
+        // resolve([&a, &b], [3, 1]);
+        // x0 > x1 ∥ ≠(x2, x3), LaneSafe(x4, x3, x5), EgoCar(x4, x2, x6, x7), DistanceBehind(x4, x3, x8, x1, x5), SpeedBehind(x4, x3, x8, x0, x5) → SafeBehindDisproven(x4, x3, x2, x6, x7, x5).
+        // -> DistanceBehind(0, 2, 4, 0, aaccelerateleft).
     }
 }

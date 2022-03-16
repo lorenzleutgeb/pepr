@@ -12,7 +12,7 @@ impl Index {
             let atom = &clause.atoms[i];
 
             if index.len() <= atom.predicate {
-                index.resize_with(atom.predicate + 1, || vec![])
+                index.resize_with(atom.predicate + 1, std::vec::Vec::new)
             }
             index[atom.predicate].push(ClausePosition::new(clause.id, i));
         }

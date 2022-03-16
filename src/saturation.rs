@@ -13,7 +13,7 @@ pub(crate) enum Result {
 
 impl State {
     pub(crate) fn saturate(&mut self) -> Result {
-        let (mut start, mut end) = (0, self.index.units.len());
+        let (start, mut end) = (0, self.index.units.len());
         loop {
             let mut resolvents: Vec<Clause> = vec![];
             for i in start..end {
@@ -39,12 +39,12 @@ impl State {
                     let pos = &index[predicate][j];
                     let candidate = &self.clauses[pos.clause];
                     debug_assert!(pos.literal < candidate.atoms.len());
-                    let unifier = unify_at([&unit, &candidate], [0, pos.literal]);
+                    let unifier = unify_at([unit, candidate], [0, pos.literal]);
                     if let Ok(sigma) = unifier {
                         //println!("Resolving {} and {}.", unit.display(&self.symbols), candidate.display(&self.symbols));
-                        let mut resolvent =
-                            resolve_with_subst([&unit, &candidate], [0, pos.literal], sigma);
-                        resolvent.normalize();
+                        let resolvent =
+                            resolve_with_subst([unit, candidate], [0, pos.literal], sigma);
+                        // resolvent = resolvent.rewrite_ne(&self.symbols);
                         if resolvent.constraint.satisfiable() {
                             if resolvent.is_empty() {
                                 return Result::Unsatisfiable;
@@ -59,11 +59,14 @@ impl State {
                             }
 
                             if subsumed {
+                                println!("Subsumed: {}", resolvent.display(&self.symbols));
                                 continue;
                             }
 
                             println!("{}", resolvent.display(&self.symbols));
                             resolvents.push(resolvent);
+                        } else {
+                            println!("Constraint is unsat: {}", resolvent.display(&self.symbols));
                         }
                     }
                 }
@@ -76,7 +79,7 @@ impl State {
             }
             end = self.index.units.len();
 
-            for mut resolvent in resolvents {
+            for resolvent in resolvents {
                 self.ingest_clause(resolvent);
             }
         }
