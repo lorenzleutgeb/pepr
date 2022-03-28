@@ -29,24 +29,24 @@ impl CTerm {
                 let result = term.normalize(sigma, next);
                 (CTerm::Inj(result.0), result.1)
             }
-            CTerm::Add(args) => {
-                let left = args[0].normalize(sigma, next);
-                let right = args[1].normalize(sigma, left.1);
-                (CTerm::Add(Box::new([left.0, right.0])), right.1)
+            CTerm::Add(t1, t2) => {
+                let left = t1.normalize(sigma, next);
+                let right = t2.normalize(sigma, left.1);
+                (CTerm::Add(Box::new(left.0), Box::new(right.0)), right.1)
             }
-            CTerm::Sub(args) => {
-                let left = args[0].normalize(sigma, next);
-                let right = args[1].normalize(sigma, left.1);
-                (CTerm::Sub(Box::new([left.0, right.0])), right.1)
+            CTerm::Sub(t1, t2) => {
+                let left = t1.normalize(sigma, next);
+                let right = t2.normalize(sigma, left.1);
+                (CTerm::Sub(Box::new(left.0), Box::new(right.0)), right.1)
             }
-            CTerm::Mul(args) => {
-                let left = args[0].normalize(sigma, next);
-                let right = args[1].normalize(sigma, left.1);
-                (CTerm::Mul(Box::new([left.0, right.0])), right.1)
+            CTerm::Mul(t1, t2) => {
+                let left = t1.normalize(sigma, next);
+                let right = t2.normalize(sigma, left.1);
+                (CTerm::Mul(Box::new(left.0), Box::new(right.0)), right.1)
             }
-            CTerm::Neg(args) => {
-                let result = args[0].normalize(sigma, next);
-                (CTerm::Neg(Box::new([result.0])), result.1)
+            CTerm::Neg(t) => {
+                let result = t.normalize(sigma, next);
+                (CTerm::Neg(Box::new(result.0)), result.1)
             }
         }
     }
@@ -54,47 +54,47 @@ impl CTerm {
     pub(crate) fn force_immediate(self, next: Variable) -> (Term, Option<CAtom>) {
         match self {
             CTerm::Inj(t) => (t, None),
-            CTerm::Add(args) => {
+            CTerm::Add(t1, t2) => {
                 let x = Term::Variable(next, Typ::R);
                 (
                     x,
                     Some(CAtom {
                         predicate: CPredicate::Eq,
                         left: CTerm::Inj(x),
-                        right: CTerm::Add(args),
+                        right: CTerm::Add(t1, t2),
                     }),
                 )
             }
-            CTerm::Mul(args) => {
+            CTerm::Mul(t1, t2) => {
                 let x = Term::Variable(next, Typ::R);
                 (
                     x,
                     Some(CAtom {
                         predicate: CPredicate::Eq,
                         left: CTerm::Inj(x),
-                        right: CTerm::Mul(args),
+                        right: CTerm::Mul(t1, t2),
                     }),
                 )
             }
-            CTerm::Sub(args) => {
+            CTerm::Sub(t1, t2) => {
                 let x = Term::Variable(next, Typ::R);
                 (
                     x,
                     Some(CAtom {
                         predicate: CPredicate::Eq,
                         left: CTerm::Inj(x),
-                        right: CTerm::Sub(args),
+                        right: CTerm::Sub(t1, t2),
                     }),
                 )
             }
-            CTerm::Neg(args) => {
+            CTerm::Neg(t) => {
                 let x = Term::Variable(next, Typ::R);
                 (
                     x,
                     Some(CAtom {
                         predicate: CPredicate::Eq,
                         left: CTerm::Inj(x),
-                        right: CTerm::Neg(args),
+                        right: CTerm::Neg(t),
                     }),
                 )
             }

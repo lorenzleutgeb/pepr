@@ -128,21 +128,19 @@ impl CTerm {
     pub(crate) fn substitute_with_offset(&self, sigma: &dyn Substitution, offset: usize) -> CTerm {
         match self {
             CTerm::Inj(t) => CTerm::Inj(t.substitute_with_offset(sigma, offset)),
-            CTerm::Add(args) => CTerm::Add(Box::new([
-                args[0].substitute_with_offset(sigma, offset),
-                args[1].substitute_with_offset(sigma, offset),
-            ])),
-            CTerm::Mul(args) => CTerm::Mul(Box::new([
-                args[0].substitute_with_offset(sigma, offset),
-                args[1].substitute_with_offset(sigma, offset),
-            ])),
-            CTerm::Sub(args) => CTerm::Sub(Box::new([
-                args[0].substitute_with_offset(sigma, offset),
-                args[1].substitute_with_offset(sigma, offset),
-            ])),
-            CTerm::Neg(args) => {
-                CTerm::Neg(Box::new([args[0].substitute_with_offset(sigma, offset)]))
-            }
+            CTerm::Add(t1, t2) => CTerm::Add(
+                Box::new(t1.substitute_with_offset(sigma, offset)),
+                Box::new(t2.substitute_with_offset(sigma, offset)),
+            ),
+            CTerm::Mul(t1, t2) => CTerm::Mul(
+                Box::new(t1.substitute_with_offset(sigma, offset)),
+                Box::new(t2.substitute_with_offset(sigma, offset)),
+            ),
+            CTerm::Sub(t1, t2) => CTerm::Sub(
+                Box::new(t1.substitute_with_offset(sigma, offset)),
+                Box::new(t2.substitute_with_offset(sigma, offset)),
+            ),
+            CTerm::Neg(t) => CTerm::Neg(Box::new(t.substitute_with_offset(sigma, offset))),
         }
     }
 }

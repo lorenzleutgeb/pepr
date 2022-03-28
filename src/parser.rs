@@ -223,18 +223,24 @@ impl CTerm {
 
         if op == Some(Rule::sub) {
             if boxed.len() == 1 {
-                CTerm::Neg(boxed.try_into().unwrap())
+                // CTerm::Neg(boxed.try_into().unwrap())
+                CTerm::Neg(Box::new(boxed[0].clone()))
             } else {
-                CTerm::Sub(boxed.try_into().unwrap())
+                CTerm::Sub(Box::new(boxed[0].clone()), Box::new(boxed[1].clone()))
+                // CTerm::Sub(boxed.try_into().unwrap())
             }
         } else if boxed.len() != 2 {
             todo!()
         } else if op == Some(Rule::add) {
-            CTerm::Add(boxed.try_into().unwrap())
+            // CTerm::Add(boxed.try_into().unwrap())
+            CTerm::Add(Box::new(boxed[0].clone()), Box::new(boxed[1].clone()))
         } else if op == Some(Rule::mul) {
             if let CTerm::Inj(term) = boxed[1] {
                 match term {
-                    Term::Constant(_, _) => CTerm::Mul(boxed.try_into().unwrap()),
+                    Term::Constant(_, _) => {
+                        //CTerm::Mul(boxed.try_into().unwrap()),
+                        CTerm::Mul(Box::new(boxed[0].clone()), Box::new(boxed[1].clone()))
+                    }
                     _ => {
                         bail_from_span(String::from("Non-Linear!"), 1, span);
                         panic!()

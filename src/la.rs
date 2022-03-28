@@ -1,5 +1,6 @@
 //! Test
 
+use crate::fm::Ineq;
 use crate::fmt::DisplayWithSymbols;
 use crate::{symbols::*, *};
 
@@ -29,24 +30,130 @@ impl CTerm {
                 ),
                 Term::Integer(value) => (*value as f64).into(),
             },
-            CTerm::Add(args) => args[0].encode(variables) + args[1].encode(variables),
-            CTerm::Sub(args) => args[0].encode(variables) - args[1].encode(variables),
-            CTerm::Neg(args) => -args[0].encode(variables),
-            CTerm::Mul(args) => args[0]
-                .encode(variables)
-                .mul(if let CTerm::Inj(term) = args[1] {
-                    match term {
-                        Term::Integer(value) => (value as f64),
-                        _ => debug_unreachable!(),
-                    }
-                } else {
-                    debug_unreachable!()
-                }),
+            CTerm::Add(t1, t2) => t1.encode(variables) + t2.encode(variables),
+            CTerm::Sub(t1, t2) => t1.encode(variables) - t2.encode(variables),
+            CTerm::Neg(t) => -t.encode(variables),
+            CTerm::Mul(t1, t2) => t1.encode(variables).mul(if let CTerm::Inj(term) = **t2 {
+                match term {
+                    Term::Integer(value) => (value as f64),
+                    _ => debug_unreachable!(),
+                }
+            } else {
+                debug_unreachable!()
+            }),
         }
     }
+
+    fn flatten(&self) -> Self {
+        match self {
+            CTerm::Inj(_) => self.clone(),
+            CTerm::Sub(t1, t2) => {
+                let t1 = t1.flatten();
+                let t2 = t2.flatten();
+                match (&t1, &t2) {
+                    (CTerm::Inj(Term::Integer(x)), CTerm::Inj(Term::Integer(y))) => {
+                        // -(c1, c2) = c1 - c2
+                        CTerm::Inj(Term::Integer(x - y))
+                    }
+                    (CTerm::Mul(c1, x1), CTerm::Mul(c2, x2)) => {
+                        if *x1 == *x2 {
+                            match (c1.as_ref(), c2.as_ref()) {
+                                (CTerm::Inj(Term::Integer(i1)), CTerm::Inj(Term::Integer(i2))) => {
+                                    // -(*(c1,x),*(c2,x)) = *(c1-c2,x)
+                                    CTerm::Mul(
+                                        Box::new(CTerm::Inj(Term::Integer(i1 - i2))),
+                                        x1.clone(),
+                                    )
+                                }
+                                _ => CTerm::Sub(Box::new(t1), Box::new(t2)),
+                            }
+                        } else {
+                            CTerm::Sub(Box::new(t1), Box::new(t2))
+                        }
+                    }
+                    _ => CTerm::Sub(Box::new(t1), Box::new(t2)),
+                }
+            }
+            CTerm::Add(t1, t2) => {
+                let t1 = t1.flatten();
+                let t2 = t2.flatten();
+                match (&t1, &t2) {
+                    (CTerm::Inj(Term::Integer(x)), CTerm::Inj(Term::Integer(y))) => {
+                        // +(c1, c2) = c1 + c2
+                        CTerm::Inj(Term::Integer(x + y))
+                    }
+                    (CTerm::Mul(c1, x1), CTerm::Mul(c2, x2)) => {
+                        if *x1 == *x2 {
+                            match (c1.as_ref(), c2.as_ref()) {
+                                (CTerm::Inj(Term::Integer(i1)), CTerm::Inj(Term::Integer(i2))) => {
+                                    CTerm::Mul(
+                                        Box::new(CTerm::Inj(Term::Integer(i1 + i2))),
+                                        x1.clone(),
+                                    )
+                                }
+                                _ => CTerm::Add(Box::new(t1), Box::new(t2)),
+                            }
+                        } else {
+                            CTerm::Add(Box::new(t1), Box::new(t2))
+                        }
+                    }
+                    _ => CTerm::Add(Box::new(t1), Box::new(t2)),
+                }
+            }
+            CTerm::Mul(t1, t2) => {
+                let t1 = t1.flatten();
+                let t2 = t2.flatten();
+                match (&t1, &t2) {
+                    (CTerm::Inj(Term::Integer(x)), CTerm::Inj(Term::Integer(y))) => {
+                        // *(c1, c2) = c1 * c2
+                        CTerm::Inj(Term::Integer(x * y))
+                    }
+                    (CTerm::Inj(Term::Variable(_, _)), CTerm::Inj(Term::Integer(_))) => {
+                        // *(x, c) = *(c, x)
+                        CTerm::Mul(Box::new(t2), Box::new(t1))
+                    }
+                    _ => CTerm::Mul(Box::new(t1), Box::new(t2)),
+                }
+            }
+            CTerm::Neg(t) => {
+                let t = t.flatten();
+                match &t {
+                    CTerm::Neg(t) => {
+                        // -(-(x)) = x
+                        *t.clone()
+                    }
+                    CTerm::Inj(Term::Integer(x)) => {
+                        // -(c1) = -ci
+                        CTerm::Inj(Term::Integer(-x))
+                    }
+                    CTerm::Mul(t1, t2) => {
+                        if let CTerm::Inj(Term::Integer(i)) = **t1 {
+                            CTerm::Mul(Box::new(CTerm::Inj(Term::Integer(-i))), t2.clone())
+                        } else {
+                            CTerm::Neg(Box::new(t))
+                        }
+                    }
+                    _ => CTerm::Neg(Box::new(t)),
+                }
+            }
+        }
+    }
+
+    /*
+    fn combine(&self, other: &CTerm) -> Option<Self> {
+        match (self, other) {
+        }
+    }
+    */
 }
 
 impl CAtom {
+    /*
+    fn canonize(&self) -> Ineq {
+
+    }
+    */
+
     fn encode(&self, variables: &Vec<LPVariable>) -> good_lp::Constraint {
         let left: Expression = self.left.encode(variables);
         let right: Expression = self.right.encode(variables);

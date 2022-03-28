@@ -148,26 +148,26 @@ pub(crate) enum CTerm {
     Inj(Term),
 
     /// Negation of a [CTerm].
-    Neg(Box<[CTerm; 1]>),
+    Neg(Box<CTerm>),
 
     /// Addition on [CTerm]. Restricted to 2 elements for simplicity.
-    Add(Box<[CTerm; 2]>),
+    Add(Box<CTerm>, Box<CTerm>),
 
     /// Subtraction on [CTerm].
-    Sub(Box<[CTerm; 2]>),
+    Sub(Box<CTerm>, Box<CTerm>),
 
     /// Multiplication on [CTerm]. Restricted to 2 elements for simplicity.
-    Mul(Box<[CTerm; 2]>),
+    Mul(Box<CTerm>, Box<CTerm>),
 }
 
 impl Display for CTerm {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             CTerm::Inj(term) => write!(f, "{}", term),
-            CTerm::Neg(args) => write!(f, "-({})", args[0]),
-            CTerm::Add(args) => write!(f, "+({},{})", args[0], args[1]),
-            CTerm::Sub(args) => write!(f, "-({},{})", args[0], args[1]),
-            CTerm::Mul(args) => write!(f, "*({},{})", args[0], args[1]),
+            CTerm::Neg(t) => write!(f, "-({})", t),
+            CTerm::Add(t1, t2) => write!(f, "+({},{})", t1, t2),
+            CTerm::Sub(t1, t2) => write!(f, "-({},{})", t1, t2),
+            CTerm::Mul(t1, t2) => write!(f, "*({},{})", t1, t2),
         }
     }
 }
@@ -183,16 +183,10 @@ impl CTerm {
     pub(crate) fn max_var(&self) -> Option<Variable> {
         match self {
             CTerm::Inj(t) => t.max_var(),
-            CTerm::Add(args) => {
-                default_combine(|x, y| x.max(y), args[0].max_var(), args[1].max_var())
-            }
-            CTerm::Mul(args) => {
-                default_combine(|x, y| x.max(y), args[0].max_var(), args[1].max_var())
-            }
-            CTerm::Sub(args) => {
-                default_combine(|x, y| x.max(y), args[0].max_var(), args[1].max_var())
-            }
-            CTerm::Neg(args) => args[0].max_var(),
+            CTerm::Add(t1, t2) => default_combine(|x, y| x.max(y), t1.max_var(), t2.max_var()),
+            CTerm::Mul(t1, t2) => default_combine(|x, y| x.max(y), t1.max_var(), t2.max_var()),
+            CTerm::Sub(t1, t2) => default_combine(|x, y| x.max(y), t1.max_var(), t2.max_var()),
+            CTerm::Neg(t) => t.max_var(),
         }
     }
 
@@ -200,22 +194,22 @@ impl CTerm {
         match self {
             CTerm::Inj(Term::Variable(x, _)) => vec![*x],
             CTerm::Inj(_) => vec![],
-            CTerm::Add(args) => {
-                let mut result: Vec<Variable> = args[0].var_occurrences();
-                result.append(&mut args[1].var_occurrences());
+            CTerm::Add(t1, t2) => {
+                let mut result: Vec<Variable> = t1.var_occurrences();
+                result.append(&mut t2.var_occurrences());
                 result
             }
-            CTerm::Mul(args) => {
-                let mut result: Vec<Variable> = args[0].var_occurrences();
-                result.append(&mut args[1].var_occurrences());
+            CTerm::Mul(t1, t2) => {
+                let mut result: Vec<Variable> = t1.var_occurrences();
+                result.append(&mut t2.var_occurrences());
                 result
             }
-            CTerm::Sub(args) => {
-                let mut result: Vec<Variable> = args[0].var_occurrences();
-                result.append(&mut args[1].var_occurrences());
+            CTerm::Sub(t1, t2) => {
+                let mut result: Vec<Variable> = t1.var_occurrences();
+                result.append(&mut t2.var_occurrences());
                 result
             }
-            CTerm::Neg(args) => args[0].var_occurrences(),
+            CTerm::Neg(t) => t.var_occurrences(),
         }
     }
 }

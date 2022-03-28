@@ -47,23 +47,23 @@ impl DisplayWithSymbols for CTerm {
     fn fmt_internal(&self, symbols: &Symbols, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match &self {
             CTerm::Inj(t) => t.fmt_internal(symbols, f),
-            CTerm::Add(args) => write!(f, "+(")
-                .and_then(|_| args[0].fmt_internal(symbols, f))
+            CTerm::Add(t1, t2) => write!(f, "+(")
+                .and_then(|_| t1.fmt_internal(symbols, f))
                 .and_then(|_| write!(f, ", "))
-                .and_then(|_| args[1].fmt_internal(symbols, f))
+                .and_then(|_| t2.fmt_internal(symbols, f))
                 .and_then(|_| write!(f, ")")),
-            CTerm::Mul(args) => write!(f, "*(")
-                .and_then(|_| args[0].fmt_internal(symbols, f))
+            CTerm::Mul(t1, t2) => write!(f, "*(")
+                .and_then(|_| t1.fmt_internal(symbols, f))
                 .and_then(|_| write!(f, ", "))
-                .and_then(|_| args[1].fmt_internal(symbols, f))
+                .and_then(|_| t2.fmt_internal(symbols, f))
                 .and_then(|_| write!(f, ")")),
-            CTerm::Sub(args) => write!(f, "-(")
-                .and_then(|_| args[0].fmt_internal(symbols, f))
+            CTerm::Sub(t1, t2) => write!(f, "-(")
+                .and_then(|_| t1.fmt_internal(symbols, f))
                 .and_then(|_| write!(f, ", "))
-                .and_then(|_| args[1].fmt_internal(symbols, f))
+                .and_then(|_| t2.fmt_internal(symbols, f))
                 .and_then(|_| write!(f, ")")),
-            CTerm::Neg(args) => write!(f, "-")
-                .and_then(|_| args[0].fmt_internal(symbols, f))
+            CTerm::Neg(t) => write!(f, "-")
+                .and_then(|_| t.fmt_internal(symbols, f))
                 .and_then(|_| write!(f, ")")),
         }
     }

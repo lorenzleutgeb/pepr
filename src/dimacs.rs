@@ -1,5 +1,3 @@
-#![feature(test)]
-
 use crate::{symbols::*, *};
 
 use ::dimacs::{parse_dimacs, Clause as DimacsClause, Instance, ParseError, Sign};
